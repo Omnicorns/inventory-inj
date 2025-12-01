@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequiredArgsConstructor
@@ -52,7 +53,34 @@ public class CatalogueController {
             return ResponseEntity.ok(resp);
         } else {
             // list semua / difilter sku
-            List<ProductInjSpecResponse> list = productInjSpecService.getAllSpec(sku);
+            List<ProductInjSpecResponse> list = productInjSpecService.getAllSpec(sku).stream()
+                    .map(resp -> {
+                        // DI SINI kamu bisa atur field mana yang mau dibikin null
+                        resp.setOdooProductId(null);
+
+                        if (resp.getRows() != null) {
+                            resp.getRows().forEach(row -> {
+                                // null-in field per row di sini
+                                row.setLocationId(null);
+                                row.setPricelistName(null);
+                                row.setQuantityOdoo(null);
+                                row.setStockPctToInj(null);
+                                row.setLimitStock(null);
+                                row.setBasePrice(null);
+                                row.setPricingMode(null);
+                                row.setAddedValuePct(null);
+                                row.setMarginInjPct(null);
+                                row.setPricingMode(null);
+                                row.setActive(null);
+
+                                // row.setSomething(null);
+                            });
+                        }
+                        // resp.setSomething(null);
+                        return resp;
+                    })
+                    .collect(Collectors.toList());
+
             return ResponseEntity.ok(list);
         }
     }

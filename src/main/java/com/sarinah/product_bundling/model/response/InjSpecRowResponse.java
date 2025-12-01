@@ -1,12 +1,13 @@
 package com.sarinah.product_bundling.model.response;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Data;
 
 import java.math.BigDecimal;
-@Data
 
+@Data
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class InjSpecRowResponse {
     private Long locationId;
     private String locationName;
