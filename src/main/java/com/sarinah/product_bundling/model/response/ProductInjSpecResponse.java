@@ -10,6 +10,7 @@ import java.util.List;
 public class ProductInjSpecResponse {
     private Long odooProductId;
     private String sku;
+    private String barcode;
     private String productName;
     private String imageBase64;              // untuk gambar di bawah tabel
 

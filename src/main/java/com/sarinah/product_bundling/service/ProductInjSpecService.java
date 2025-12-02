@@ -95,6 +95,7 @@ public class ProductInjSpecService {
 
         ProductInjSpecResponse resp = new ProductInjSpecResponse();
         resp.setOdooProductId(product.getOdooProductId());
+        resp.setBarcode(product.getBarcode());
         resp.setSku(product.getSku());
         resp.setProductName(product.getName());
         resp.setImageBase64(product.getImageBase64());
