@@ -49,14 +49,39 @@ public class ProductInjSpecService {
                     .findFirstByOdooProductIdAndLocationId(odooProductId, stock.getLocationId())
                     .orElse(null);
 
-            // --- STOCK ---
-            BigDecimal stockPct = cfg != null && cfg.getStockPctToInj() != null
-                    ? cfg.getStockPctToInj()
-                    : BigDecimal.valueOf(100); // default 100%
+            // ========== STOCK ==========
 
-           BigDecimal limitStock = computeLimitStock(stock.getQuantity(), stockPct);
+            // stok Odoo saat ini
+            BigDecimal qtyOdoo = stock.getQuantity() != null
+                    ? stock.getQuantity()
+                    : BigDecimal.ZERO;
 
-            // --- PRICING ---
+            // ⛔️ TIDAK pakai persen lagi.
+            // ✅ stockPctToInj kita pakai sebagai "limitStockConfig" (qty), bukan persen.
+            BigDecimal limitStock = BigDecimal.ZERO;
+            if (cfg != null && cfg.getStockPctToInj() != null) {
+                limitStock = cfg.getStockPctToInj();
+            }
+            if (limitStock.compareTo(BigDecimal.ZERO) < 0) {
+                limitStock = BigDecimal.ZERO;
+            }
+
+            // sellStock = max(qtyOdoo - limitStock, 0)
+            BigDecimal sellStock = qtyOdoo.subtract(limitStock);
+            if (sellStock.compareTo(BigDecimal.ZERO) < 0) {
+                sellStock = BigDecimal.ZERO;
+            }
+            sellStock = sellStock.setScale(0, RoundingMode.DOWN);
+
+            // Kalau masih mau info persen ke INJ, hitung sebagai INFO SAJA (derived)
+            BigDecimal stockPctToInj = BigDecimal.ZERO;
+            if (qtyOdoo.compareTo(BigDecimal.ZERO) > 0 && sellStock.compareTo(BigDecimal.ZERO) > 0) {
+                stockPctToInj = sellStock
+                        .multiply(BigDecimal.valueOf(100))
+                        .divide(qtyOdoo, 2, RoundingMode.HALF_UP);
+            }
+
+            // ========== PRICING ==========
             String pricingMode = (cfg != null && cfg.getPricingMode() != null)
                     ? cfg.getPricingMode()
                     : "NONE";
@@ -71,16 +96,22 @@ public class ProductInjSpecService {
                     marginPct
             );
 
-            // --- BANGUN DTO ROW ---
+            // ========== BANGUN DTO ==========
             InjSpecRowResponse row = new InjSpecRowResponse();
             row.setLocationId(stock.getLocationId());
             row.setLocationName(stock.getLocationName());
             row.setPricelistName(stock.getPricelistName());
 
-            row.setQuantityOdoo(stock.getQuantity().intValue());
-            row.setStockPctToInj(stockPct);
+            row.setQuantityOdoo(qtyOdoo.intValue());
+
+            // INFO only (kalau mau ditampilkan di UI atau sekedar disimpan)
+            row.setStockPctToInj(stockPctToInj);
+
+            // LIMIT YANG DI-DEFINE DI UI (config, disimpan di kolom stock_pct_to_inj)
             row.setLimitStock(limitStock);
-            row.setStock(limitStock);
+
+            // SELL STOCK = stok yang boleh ke InJourney
+            row.setStock(sellStock);
 
             row.setBasePrice(stock.getPrice());
             row.setPricingMode(pricingMode);
@@ -215,7 +246,6 @@ public class ProductInjSpecService {
 
     // ==== PUT untuk simpan rule dari UI ====
     public void saveSpecForProduct(Long odooProductId, List<InjSpecRowUpdateRequest> rows) {
-
         CatalogueProduct product = catalogueProductRepository.findByOdooProductId(odooProductId)
                 .orElseThrow(() -> new RuntimeException("Product not found: " + odooProductId));
 
@@ -234,18 +264,38 @@ public class ProductInjSpecService {
             //      .findFirstByProductIdAndLocationId(product.getId(), r.getLocationId());
             // cfg.setPricelistName(s.getPricelistName());
 
+            // ========== PRICING MODE ==========
             String mode = (r.getPricingMode() == null || r.getPricingMode().isBlank())
                     ? "NONE"
                     : r.getPricingMode();
             cfg.setPricingMode(mode);
 
-            cfg.setAddedValuePct(r.getAddedValuePct());
-            cfg.setMarginInjPct(r.getMarginInjPct());
-            cfg.setStockPctToInj(r.getStockPctToInj());
+            cfg.setAddedValuePct(
+                    r.getAddedValuePct() != null ? r.getAddedValuePct() : BigDecimal.ZERO
+            );
+            cfg.setMarginInjPct(
+                    r.getMarginInjPct() != null ? r.getMarginInjPct() : BigDecimal.ZERO
+            );
+
+            // ========== LIMIT STOCK (PAKAI FIELD stockPctToInj SEBAGAI LIMIT QTY) ==========
+            BigDecimal limitStock = r.getStockPctToInj() != null
+                    ? r.getStockPctToInj()
+                    : BigDecimal.ZERO;
+
+            if (limitStock.compareTo(BigDecimal.ZERO) < 0) {
+                limitStock = BigDecimal.ZERO;
+            }
+
+            // ⬇ sekarang kolom stock_pct_to_inj = LIMIT STOCK, BUKAN PERSEN
+            cfg.setStockPctToInj(limitStock);
+
             cfg.setActive(r.getActive() != null ? r.getActive() : Boolean.TRUE);
 
             productBundlingRepository.save(cfg);
         }
+
+
+
     }
 
     // ========= helper =========

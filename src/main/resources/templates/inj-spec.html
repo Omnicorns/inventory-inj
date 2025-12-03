@@ -51,6 +51,9 @@
         .switch-active {
             transform: scale(1.1);
         }
+        .summary-text {
+            font-size: 0.78rem;
+        }
     </style>
 </head>
 <body>
@@ -100,6 +103,9 @@
                         Odoo ID:
                         <span class="fw-semibold" th:text="${spec.odooProductId}">0</span>
                     </div>
+                    <div class="text-muted summary-text mt-1">
+
+                    </div>
                 </div>
             </div>
             <div class="text-end">
@@ -117,9 +123,7 @@
     <div class="card">
         <div class="card-header d-flex align-items-center justify-content-between">
             <div>
-                <strong>Konfigurasi Harga & Stok per Lokasi</strong>
-                <div class="text-muted small">
-                    Atur % stok, mode harga, added value & margin untuk setiap lokasi.
+
                 </div>
             </div>
         </div>
@@ -133,8 +137,8 @@
                         <th>Location</th>
                         <th>Pricelist</th>
                         <th class="text-end">Stock Odoo</th>
-                        <th class="text-end">% Stock ke INJ</th>
-                        <th class="text-end">Limit Stock</th>
+                        <th class="text-end">Sell Stock INJ</th>
+                        <th class="text-end">Limit Stock (Config)</th>
                         <th class="text-end">Base Price</th>
                         <th>Mode</th>
                         <th class="text-end">Add %</th>
@@ -145,34 +149,40 @@
                     </thead>
                     <tbody>
                     <tr th:each="row,iter : ${rows}"
-                        th:attr="data-location-id=${row.locationId}">
+                        th:attr="data-location-id=${row.locationId},
+                                 data-qty-odoo=${row.quantityOdoo},
+                                 data-base-price=${row.basePrice}">
                         <td class="text-center" th:text="${iter.index + 1}">1</td>
 
                         <td th:text="${row.locationName}">THA/Stock/JPO</td>
                         <td th:text="${row.pricelistName}">Pricelist</td>
 
-                        <!-- qty & limit hanya display -->
-                        <td class="text-end"
+                        <!-- Stock Odoo (display) -->
+                        <td class="text-end js-qty-odoo"
                             th:text="${#numbers.formatInteger(row.quantityOdoo, 0, 'POINT')}">
                             0
                         </td>
-                        <td class="text-end">
-                            <input type="number" step="0.01"
-                                   class="form-control form-control-sm d-inline-block input-xs js-stock-pct text-end"
-                                   th:value="${row.stockPctToInj}"/>
-                        </td>
-                        <td class="text-end js-limit-stock"
-                            th:text="${#numbers.formatInteger(row.limitStock, 0, 'POINT')}">
+
+                        <!-- Sell Stock INJ (hasil perhitungan: qty - limit) -->
+                        <td class="text-end js-sell-stock"
+                            th:text="${#numbers.formatInteger(row.stock, 0, 'POINT')}">
                             0
                         </td>
 
-                        <!-- base price & sell price display -->
-                        <td class="text-end price-cell"
+                        <!-- Limit Stock CONFIG (boleh diubah manual) -->
+                        <td class="text-end">
+                            <input type="number" step="1" min="0"
+                                   class="form-control form-control-sm d-inline-block input-xs js-limit-input text-end"
+                                   th:value="${row.limitStock}"/>
+                        </td>
+
+                        <!-- Base Price (display) -->
+                        <td class="text-end price-cell js-base-price"
                             th:text="${#numbers.formatInteger(row.basePrice, 0, 'POINT')}">
                             0
                         </td>
 
-                        <!-- mode -->
+                        <!-- Mode harga -->
                         <td>
                             <select class="form-select form-select-sm js-pricing-mode">
                                 <option value="NONE"
@@ -184,7 +194,7 @@
                             </select>
                         </td>
 
-                        <!-- added & margin edit -->
+                        <!-- Added & Margin -->
                         <td class="text-end">
                             <input type="number" step="0.01"
                                    class="form-control form-control-sm d-inline-block input-xs text-end js-added"
@@ -196,11 +206,13 @@
                                    th:value="${row.marginInjPct}"/>
                         </td>
 
+                        <!-- Sell Price (display, dihitung dari mode) -->
                         <td class="text-end price-cell js-sell-price"
                             th:text="${#numbers.formatInteger(row.sellPrice, 0, 'POINT')}">
                             0
                         </td>
 
+                        <!-- Active -->
                         <td class="text-center">
                             <input type="checkbox"
                                    class="form-check-input switch-active js-active"
@@ -224,28 +236,119 @@
 </div>
 
 <script th:inline="javascript">
-    // URL base API REST backend kamu
     const API_BASE = /*[[@{/sarinah-forwarder/v1/catalogue}]]*/ "/sarinah-forwarder/v1/catalogue";
     const ODOO_PRODUCT_ID = /*[[${spec.odooProductId}]]*/ 0;
+
+    function formatNumberId(n) {
+        if (isNaN(n)) return "0";
+        return n.toLocaleString('id-ID');
+    }
+
+    function recalcRow(tr) {
+        const qty = parseFloat(tr.getAttribute("data-qty-odoo") || "0");
+        const basePrice = parseFloat(tr.getAttribute("data-base-price") || "0");
+
+        const limitInput  = tr.querySelector(".js-limit-input");
+        const sellStockEl = tr.querySelector(".js-sell-stock");
+
+        const modeSelect  = tr.querySelector(".js-pricing-mode");
+        const addedInput  = tr.querySelector(".js-added");
+        const marginInput = tr.querySelector(".js-margin");
+        const sellPriceEl = tr.querySelector(".js-sell-price");
+
+        // 1) Baca limitStock (konfigurasi)
+        let limitStock = limitInput && limitInput.value !== ""
+            ? parseFloat(limitInput.value)
+            : 0;
+        if (isNaN(limitStock)) limitStock = 0;
+        if (limitStock < 0) limitStock = 0;
+
+        // 2) Hitung sellStock = max(qty - limitStock, 0)
+        let sellQty = qty - limitStock;
+        if (sellQty < 0) sellQty = 0;
+
+        if (sellStockEl) {
+            sellStockEl.textContent = formatNumberId(Math.floor(sellQty));
+        }
+
+        // 3) Hitung Sell Price berdasarkan mode
+        let addedPct = addedInput && addedInput.value !== ""
+            ? parseFloat(addedInput.value) : 0;
+        let marginPct = marginInput && marginInput.value !== ""
+            ? parseFloat(marginInput.value) : 0;
+
+        let sellPrice = basePrice;
+
+        if (modeSelect) {
+            const mode = modeSelect.value || "NONE";
+            if (mode === "ADDED_VALUE") {
+                sellPrice = basePrice * (1 + (addedPct / 100.0));
+            } else if (mode === "MARGIN") {
+                if (marginPct >= 100) {
+                    sellPrice = 0;
+                } else {
+                    sellPrice = basePrice / (1 - (marginPct / 100.0));
+                }
+            }
+        }
+
+        if (sellPriceEl) {
+            sellPriceEl.textContent = formatNumberId(Math.round(sellPrice));
+        }
+    }
+
+    function recalcAllRows() {
+        document.querySelectorAll("tbody tr[data-location-id]").forEach(tr => {
+            recalcRow(tr);
+        });
+    }
+
+    function attachRowListeners() {
+        document.querySelectorAll("tbody tr[data-location-id]").forEach(tr => {
+            const limitInput  = tr.querySelector(".js-limit-input");
+            const modeSelect  = tr.querySelector(".js-pricing-mode");
+            const addedInput  = tr.querySelector(".js-added");
+            const marginInput = tr.querySelector(".js-margin");
+
+            if (limitInput) {
+                limitInput.addEventListener("input", () => recalcRow(tr));
+            }
+            if (modeSelect) {
+                modeSelect.addEventListener("change", () => recalcRow(tr));
+            }
+            if (addedInput) {
+                addedInput.addEventListener("input", () => recalcRow(tr));
+            }
+            if (marginInput) {
+                marginInput.addEventListener("input", () => recalcRow(tr));
+            }
+        });
+    }
 
     function collectRowsPayload() {
         const rows = [];
         document.querySelectorAll("tbody tr[data-location-id]").forEach(tr => {
             const locationId = parseInt(tr.getAttribute("data-location-id"));
 
-            const stockPctInput = tr.querySelector(".js-stock-pct");
+            const limitInput = tr.querySelector(".js-limit-input");
             const modeSelect = tr.querySelector(".js-pricing-mode");
             const addedInput = tr.querySelector(".js-added");
-            const marginInput = tr.querySelector(".js-margin");
-            const activeCheck = tr.querySelector(".js-active");
+            const marginInput= tr.querySelector(".js-margin");
+            const activeCheck= tr.querySelector(".js-active");
+
+            let limitStock = limitInput && limitInput.value !== ""
+                ? parseFloat(limitInput.value)
+                : 0;
+            if (isNaN(limitStock)) limitStock = 0;
 
             const payloadRow = {
                 locationId: isNaN(locationId) ? null : locationId,
-                pricingMode: modeSelect.value || "NONE",
-                addedValuePct: addedInput.value ? parseFloat(addedInput.value) : 0,
-                marginInjPct: marginInput.value ? parseFloat(marginInput.value) : 0,
-                stockPctToInj: stockPctInput.value ? parseFloat(stockPctInput.value) : 100,
-                active: activeCheck.checked
+                pricingMode: modeSelect ? (modeSelect.value || "NONE") : "NONE",
+                addedValuePct: addedInput && addedInput.value ? parseFloat(addedInput.value) : 0,
+                marginInjPct: marginInput && marginInput.value ? parseFloat(marginInput.value) : 0,
+                // 👉 kirim sebagai stockPctToInj, tapi MAKNA-nya = limitStock (qty)
+                stockPctToInj: limitStock,
+                active: activeCheck ? activeCheck.checked : true
             };
 
             rows.push(payloadRow);
@@ -255,7 +358,7 @@
 
     async function saveConfig() {
         const statusEl = document.getElementById("saveStatus");
-        const btnSave = document.getElementById("btnSave");
+        const btnSave  = document.getElementById("btnSave");
 
         statusEl.textContent = "Menyimpan...";
         statusEl.classList.remove("text-success", "text-danger");
@@ -297,6 +400,9 @@
         if (btnSave) {
             btnSave.addEventListener("click", saveConfig);
         }
+
+        attachRowListeners();
+        recalcAllRows(); // inisialisasi awal (kalibrasi ulang sell stock & harga)
     });
 </script>
 
