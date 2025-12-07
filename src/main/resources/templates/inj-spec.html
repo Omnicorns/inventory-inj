@@ -54,6 +54,52 @@
         .summary-text {
             font-size: 0.78rem;
         }
+
+        /* 🎨 Styling simulasi limit */
+        .sim-box {
+            margin-top: 10px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            border: 1px solid #d5ddff;
+            background: linear-gradient(135deg, #eef2ff 0%, #f7f8ff 100%);
+        }
+        .sim-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            font-weight: 600;
+            color: #4b5563;
+            margin-bottom: 4px;
+        }
+        .sim-input-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+        .sim-input-row span {
+            font-size: 0.78rem;
+            color: #4b5563;
+        }
+        .sim-helper {
+            font-size: 0.72rem;
+            color: #6b7280;
+        }
+        .sim-textarea {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 0.78rem;
+            background: #ffffff;
+            color: #0f172a;
+            border-radius: 8px;
+            border: 1px solid #1f2937;
+            min-height: 72px;
+            resize: vertical;
+        }
+        .sim-summary {
+            font-size: 0.72rem;
+            color: #F54927;
+            margin-top: 4px;
+        }
     </style>
 </head>
 <body>
@@ -83,28 +129,60 @@
         <div class="card-body d-flex align-items-center justify-content-between">
             <div class="d-flex align-items-center gap-3">
                 <div>
-                    <!-- ✅ panggil sebagai data URL -->
-                    <img th:if="${spec.imageBase64 != null}"
-                         th:src="'data:image/jpeg;base64,' + ${spec.imageBase64}"
+                    <!-- ✅ gambar dari varian pertama (imageBase64) -->
+                    <img th:if="${!#lists.isEmpty(spec.variants) and spec.variants[0].imageBase64 != null}"
+                         th:src="'data:image/jpeg;base64,' + ${spec.variants[0].imageBase64}"
                          alt="Product Image"
                          class="product-img border"/>
-                    <div th:if="${spec.imageBase64 == null}"
+
+                    <div th:if="${#lists.isEmpty(spec.variants) || spec.variants[0].imageBase64 == null}"
                          class="product-img d-flex align-items-center justify-content-center text-muted">
                         No Image
                     </div>
                 </div>
                 <div>
                     <div class="text-muted mb-1" style="font-size: 0.8rem;">INJ SPECIFICATION</div>
-                    <h5 class="mb-1" th:text="${spec.productName}">Nama Produk</h5>
+                    <h5 class="mb-1" th:text="${spec.templateName}">Nama Produk</h5>
+
                     <div class="text-muted">
                         SKU:
-                        <span class="fw-semibold" th:text="${spec.sku}">SKU-XXX</span>
+                        <span class="fw-semibold"
+                              th:text="${#lists.isEmpty(spec.variants) ? 'N/A' : spec.variants[0].sku}">
+                            SKU-XXX
+                        </span>
                         &nbsp;&nbsp;|&nbsp;&nbsp;
                         Odoo ID:
-                        <span class="fw-semibold" th:text="${spec.odooProductId}">0</span>
+                        <span class="fw-semibold"
+                              th:text="${odooProductId}">
+                            0
+                        </span>
                     </div>
-                    <div class="text-muted summary-text mt-1">
 
+                    <!-- 🧮 SIMULASI LIMIT: PERSENTASE + TEXTAREA -->
+                    <div class="summary-text sim-box">
+                        <div class="sim-label">Simulasi Limit Stock</div>
+
+                        <div class="sim-input-row">
+                            <span>Persentase limit dari stock Odoo</span>
+                            <input type="number"
+                                   id="globalLimitPct"
+                                   class="form-control form-control-sm input-xs text-end"
+                                   min="0" max="100" step="1"
+                                   value="0"/>
+                            <span>%</span>
+                        </div>
+                        <div class="sim-helper mb-1">
+                            Masukkan nilai 0–100. Simulasi tidak mengubah konfigurasi di tabel, hanya menampilkan preview.
+                        </div>
+
+                        <textarea id="limitPreview"
+                                  class="form-control form-control-sm sim-textarea"
+                                  rows="3"
+                                  readonly>Masukkan persentase untuk melihat simulasi limit & sell stock per lokasi.</textarea>
+
+                        <div id="simSummary" class="sim-summary">
+                            Total stock Odoo: - | Total limit: - | Total sell: -
+                        </div>
                     </div>
                 </div>
             </div>
@@ -121,14 +199,15 @@
 
     <!-- TABEL SPESIFIKASI PER LOKASI -->
     <div class="card">
-        <div class="card-header d-flex align-items-center justify-content-between">
-            <div>
-
-                </div>
+        <!-- HEADER TABEL SEDERHANA -->
+        <div class="card-header">
+            <div class="fw-semibold">Konfigurasi per Lokasi</div>
+            <div class="text-muted small">
+                Atur limit stock, mode harga, dan harga jual untuk tiap lokasi.
             </div>
         </div>
-        <div class="card-body p-0">
 
+        <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-sm align-middle mb-0">
                     <thead class="text-nowrap">
@@ -149,9 +228,10 @@
                     </thead>
                     <tbody>
                     <tr th:each="row,iter : ${rows}"
-                        th:attr="data-location-id=${row.locationId},
-                                 data-qty-odoo=${row.quantityOdoo},
-                                 data-base-price=${row.basePrice}">
+                        class="js-row"
+                        th:data-location-id="${row.locationId}"
+                        th:data-qty-odoo="${row.quantityOdoo}"
+                        th:data-base-price="${row.basePrice}">
                         <td class="text-center" th:text="${iter.index + 1}">1</td>
 
                         <td th:text="${row.locationName}">THA/Stock/JPO</td>
@@ -237,7 +317,9 @@
 
 <script th:inline="javascript">
     const API_BASE = /*[[@{/sarinah-forwarder/v1/catalogue}]]*/ "/sarinah-forwarder/v1/catalogue";
-    const ODOO_PRODUCT_ID = /*[[${spec.odooProductId}]]*/ 0;
+
+    // ✅ sekarang pakai odooProductId dari controller, BUKAN variantId
+    const ODOO_PRODUCT_ID = /*[[${odooProductId}]]*/ 0;
 
     function formatNumberId(n) {
         if (isNaN(n)) return "0";
@@ -256,14 +338,12 @@
         const marginInput = tr.querySelector(".js-margin");
         const sellPriceEl = tr.querySelector(".js-sell-price");
 
-        // 1) Baca limitStock (konfigurasi)
         let limitStock = limitInput && limitInput.value !== ""
             ? parseFloat(limitInput.value)
             : 0;
         if (isNaN(limitStock)) limitStock = 0;
         if (limitStock < 0) limitStock = 0;
 
-        // 2) Hitung sellStock = max(qty - limitStock, 0)
         let sellQty = qty - limitStock;
         if (sellQty < 0) sellQty = 0;
 
@@ -271,7 +351,6 @@
             sellStockEl.textContent = formatNumberId(Math.floor(sellQty));
         }
 
-        // 3) Hitung Sell Price berdasarkan mode
         let addedPct = addedInput && addedInput.value !== ""
             ? parseFloat(addedInput.value) : 0;
         let marginPct = marginInput && marginInput.value !== ""
@@ -298,13 +377,13 @@
     }
 
     function recalcAllRows() {
-        document.querySelectorAll("tbody tr[data-location-id]").forEach(tr => {
+        document.querySelectorAll("tbody tr.js-row").forEach(tr => {
             recalcRow(tr);
         });
     }
 
     function attachRowListeners() {
-        document.querySelectorAll("tbody tr[data-location-id]").forEach(tr => {
+        document.querySelectorAll("tbody tr.js-row").forEach(tr => {
             const limitInput  = tr.querySelector(".js-limit-input");
             const modeSelect  = tr.querySelector(".js-pricing-mode");
             const addedInput  = tr.querySelector(".js-added");
@@ -325,9 +404,57 @@
         });
     }
 
+    function updateLimitPreview(pct) {
+        const ta = document.getElementById("limitPreview");
+        const summaryEl = document.getElementById("simSummary");
+        if (!ta) return;
+
+        if (isNaN(pct) || pct < 0) pct = 0;
+        if (pct > 100) pct = 100;
+
+        const lines = [];
+        lines.push(`Persentase limit: ${pct}%`);
+        lines.push("");
+
+        let totalQty = 0;
+        let totalLimit = 0;
+        let totalSell = 0;
+
+        document.querySelectorAll("tbody tr.js-row").forEach(tr => {
+            const locNameEl = tr.querySelector("td:nth-child(2)");
+            const locName = locNameEl ? locNameEl.textContent.trim() : "Lokasi";
+
+            const qty = parseFloat(tr.getAttribute("data-qty-odoo") || "0");
+            const limitQty = Math.floor(qty * (pct / 100.0));
+            const sellQty = Math.max(qty - limitQty, 0);
+
+            totalQty += qty;
+            totalLimit += limitQty;
+            totalSell += sellQty;
+
+            lines.push(
+                `${locName}: stock=${formatNumberId(qty)}, limit=${formatNumberId(limitQty)}, sell=${formatNumberId(sellQty)}`
+            );
+        });
+
+        lines.push("");
+        lines.push(
+            `TOTAL: stock=${formatNumberId(totalQty)}, limit=${formatNumberId(totalLimit)}, sell=${formatNumberId(totalSell)}`
+        );
+
+        ta.value = lines.join("\n");
+
+        if (summaryEl) {
+            summaryEl.textContent =
+                `Total stock Odoo: ${formatNumberId(totalQty)} | ` +
+                `Total limit: ${formatNumberId(totalLimit)} | ` +
+                `Total sell: ${formatNumberId(totalSell)}`;
+        }
+    }
+
     function collectRowsPayload() {
         const rows = [];
-        document.querySelectorAll("tbody tr[data-location-id]").forEach(tr => {
+        document.querySelectorAll("tbody tr.js-row").forEach(tr => {
             const locationId = parseInt(tr.getAttribute("data-location-id"));
 
             const limitInput = tr.querySelector(".js-limit-input");
@@ -346,7 +473,6 @@
                 pricingMode: modeSelect ? (modeSelect.value || "NONE") : "NONE",
                 addedValuePct: addedInput && addedInput.value ? parseFloat(addedInput.value) : 0,
                 marginInjPct: marginInput && marginInput.value ? parseFloat(marginInput.value) : 0,
-                // 👉 kirim sebagai stockPctToInj, tapi MAKNA-nya = limitStock (qty)
                 stockPctToInj: limitStock,
                 active: activeCheck ? activeCheck.checked : true
             };
@@ -402,7 +528,21 @@
         }
 
         attachRowListeners();
-        recalcAllRows(); // inisialisasi awal (kalibrasi ulang sell stock & harga)
+        recalcAllRows();
+
+        const pctInput = document.getElementById("globalLimitPct");
+        if (pctInput) {
+            const handler = () => {
+                let pct = pctInput.value !== "" ? parseFloat(pctInput.value) : 0;
+                if (isNaN(pct)) pct = 0;
+                if (pct < 0) pct = 0;
+                if (pct > 100) pct = 100;
+                pctInput.value = pct;
+                updateLimitPreview(pct);
+            };
+            pctInput.addEventListener("input", handler);
+            handler();
+        }
     });
 </script>
 

@@ -35,17 +35,6 @@
         background: #eef2ff;
         color: #4338ca;
     }
-    .badge-location {
-        font-size: 0.75rem;
-        background: #ecfdf3;
-        color: #166534;
-        border-radius: 999px;
-        padding: 3px 10px;
-    }
-    .badge-location.off {
-        background: #fee2e2;
-        color: #991b1b;
-    }
     .search-wrap {
         border-radius: 999px;
         border: 1px solid #d4d7e8;
@@ -147,23 +136,18 @@
             <input type="text"
                    name="q"
                    class="form-control form-control-sm bg-transparent"
-                   placeholder="Cari SKU / nama produk..."
+                   placeholder="Cari nama template / brand..."
                    th:value="${q}">
           </div>
         </div>
 
-        <!-- Filter lokasi -->
+        <!-- (Opsional) Filter lain, kalau masih dipakai -->
         <div class="col-md-3">
-          <select name="locationId"
-                  class="form-select form-select-sm">
-            <option value="" th:selected="${locationId == null}">Semua lokasi</option>
-            <option th:each="loc : ${locations}"
-                    th:value="${loc.id}"
-                    th:text="${loc.name}"
-                    th:selected="${locationId != null and locationId == loc.id}">
-              THA/Stock/JPO
-            </option>
-          </select>
+          <input type="text"
+                 name="category"
+                 class="form-control form-control-sm"
+                 placeholder="Filter kategori (opsional)"
+                 th:value="${category}">
         </div>
 
         <!-- Page size -->
@@ -190,49 +174,46 @@
         <table class="table table-hover mb-0">
           <thead>
           <tr>
-            <th class="ps-4">Produk</th>
-            <th>SKU</th>
-            <th class="text-center">Lokasi Aktif</th>
-            <th class="text-center">Total Lokasi</th>
-            <th class="text-center">Terakhir Sync</th>
+            <th class="ps-4">Template</th>
+            <th>Brand / Owner</th>
+            <th>Kategori</th>
+            <th class="text-center">Jumlah Varian</th>
             <th class="text-end pe-4">Aksi</th>
           </tr>
           </thead>
           <tbody>
 
+          <!-- row = ProductOdooInjSpecResponse -->
           <tr th:each="row : ${page.content}">
+            <!-- Template Name -->
             <td class="ps-4">
-              <div class="fw-semibold" th:text="${row.productName}">Nama Produk</div>
+              <div class="fw-semibold" th:text="${row.templateName}">Nama Template</div>
+              <div class="small text-muted">
+                ID: <span th:text="${row.templateId}">0</span>
+              </div>
             </td>
+
+            <!-- Brand + Owner -->
             <td>
-              <span class="sku-text" th:text="${row.sku}">SKU-XXX</span>
+              <div class="sku-text mb-1" th:text="${row.brand}">Brand</div>
+              <div class="small text-muted" th:text="${row.ownerId}">Owner</div>
             </td>
+
+            <!-- Category -->
+            <td>
+              <span class="small text-muted" th:text="${row.category}">Kategori</span>
+            </td>
+
+            <!-- Jumlah Varian -->
             <td class="text-center">
-              <span class="badge-location"
-                    th:classappend="${row.activeLocationCount == 0} ? ' off'">
-                <span th:text="${row.activeLocationCount}">0</span> aktif
+              <span class="badge bg-light text-dark">
+                <span th:text="${#lists.size(row.variants)}">0</span> varian
               </span>
             </td>
-            <td class="text-center">
-              <span class="text-muted small">
-                <span th:text="${row.locationCount}">0</span> lokasi
-              </span>
-            </td>
-            <td class="text-center">
-              <!-- kalau ada lastSyncedAt -->
-              <span class="small text-muted"
-                    th:if="${row.lastSyncedAt != null}"
-                    th:text="${#temporals.format(row.lastSyncedAt, 'dd MMM yyyy HH:mm')}">
-                01 Jan 2025 10:00
-              </span>
-              <!-- kalau null / belum pernah -->
-              <span class="small text-muted"
-                    th:if="${row.lastSyncedAt == null}">
-                Belum pernah
-              </span>
-            </td>
+
+            <!-- Aksi -->
             <td class="text-end pe-4">
-              <a th:href="@{/catalogue-ui/inj-spec(odooProductId=${row.odooProductId})}"
+              <a th:href="@{/catalogue-ui/inj-spec(odooProductId=${row.templateId})}"
                  class="btn btn-outline-primary btn-sm btn-config">
                 Atur INJ
               </a>
@@ -240,7 +221,7 @@
           </tr>
 
           <tr th:if="${#lists.isEmpty(page.content)}">
-            <td colspan="6" class="empty-state">
+            <td colspan="5" class="empty-state">
               Tidak ada produk yang cocok dengan filter ini.
             </td>
           </tr>
@@ -271,7 +252,7 @@
               <a class="page-link"
                  th:href="@{/catalogue-ui/inj-spec-list(
                                    q=${q},
-                                   locationId=${locationId},
+                                   category=${category},
                                    size=${size},
                                    page=${page.number - 1}
                                )}">&laquo;</a>
@@ -285,7 +266,7 @@
                  th:text="${p + 1}"
                  th:href="@{/catalogue-ui/inj-spec-list(
                                    q=${q},
-                                   locationId=${locationId},
+                                   category=${category},
                                    size=${size},
                                    page=${p}
                                )}">
@@ -298,7 +279,7 @@
               <a class="page-link"
                  th:href="@{/catalogue-ui/inj-spec-list(
                                    q=${q},
-                                   locationId=${locationId},
+                                   category=${category},
                                    size=${size},
                                    page=${page.number + 1}
                                )}">&raquo;</a>
@@ -313,13 +294,10 @@
 
 </div>
 
-<!-- AUTO REFRESH -->
+<!-- AUTO REFRESH (opsional, bisa dimatikan kalau mengganggu) -->
 <script>
-  // auto refresh setiap 60 detik (60000 ms)
   const REFRESH_INTERVAL_MS = 60000;
-
   setInterval(function () {
-    // reload halaman dengan parameter filter yang sama
     window.location.reload();
   }, REFRESH_INTERVAL_MS);
 </script>

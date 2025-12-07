@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.sarinah.product_bundling.model.entity.InventoryInj;
 import com.sarinah.product_bundling.model.request.InjSpecRowUpdateRequest;
 import com.sarinah.product_bundling.model.response.ProductInjSpecResponse;
+import com.sarinah.product_bundling.model.response.ProductOdooInjSpecResponse;
 import com.sarinah.product_bundling.service.InventoryInjService;
 import com.sarinah.product_bundling.service.PostCatalogueList;
 import com.sarinah.product_bundling.service.ProductInjSpecService;
@@ -32,7 +33,7 @@ public class CatalogueController {
             @PathVariable Long odooProductId,
             @RequestBody List<InjSpecRowUpdateRequest> rows
     ) {
-        productInjSpecService.saveSpecForProduct(odooProductId, rows);
+        productInjSpecService.saveSpecForOdooProduct(odooProductId, rows);
         return ResponseEntity.noContent().build();
     }
 
@@ -47,36 +48,55 @@ public class CatalogueController {
             @RequestParam(required = false) Long odooProductId,
             @RequestParam(required = false) String sku
     ) {
-        if (odooProductId != null) {
-            // detail 1 produk
-            ProductInjSpecResponse resp = productInjSpecService.getSpecForProduct(odooProductId);
-            return ResponseEntity.ok(resp);
-        } else {
+//        if (odooProductId != null) {
+//            // detail 1 produk
+//           // ProductInjSpecResponse resp = productInjSpecService.getSpecForProduct(odooProductId);
+//           // return ResponseEntity.ok(resp);
+//        } else {
             // list semua / difilter sku
-            List<ProductInjSpecResponse> list = productInjSpecService.getAllSpec(sku).stream()
+            List<ProductOdooInjSpecResponse> list = productInjSpecService.getAllSpec(sku)
+                    .stream()
                     .map(resp -> {
-                        // DI SINI kamu bisa atur field mana yang mau dibikin null
-                        resp.setOdooProductId(null);
+                        resp.setBrand(null);
+                        resp.setOwnerId(null);
+                        resp.setProductId(resp.getTemplateId());
+                        resp.setProductName(resp.getTemplateName());
+                        resp.setTemplateId(null);
+                        resp.setTemplateName(null);
 
-                        if (resp.getRows() != null) {
-                            resp.getRows().forEach(row -> {
-                                // null-in field per row di sini
-                                row.setLocationId(null);
-                                row.setPricelistName(null);
-                                row.setQuantityOdoo(null);
-                                row.setStockPctToInj(null);
-                                row.setLimitStock(null);
-                                row.setBasePrice(null);
-                                row.setPricingMode(null);
-                                row.setAddedValuePct(null);
-                                row.setMarginInjPct(null);
-                                row.setPricingMode(null);
-                                row.setActive(null);
+                        // (opsional) kalau ada field template yang mau di-null-kan
+                        // resp.setOwnerId(null);
+                        // resp.setBrand(null);
+                        // dst...
 
-                                // row.setSomething(null);
+                        if (resp.getVariants() != null) {
+                            resp.getVariants().forEach(variant -> {
+
+                                // (opsional) null-kan field yang “berat” di variant
+                                ;
+                                // variant.setListPrice(null);
+                                // dst...
+
+                                variant.setListPrice(null);
+
+                                if (variant.getRows() != null) {
+                                    variant.getRows().forEach(row -> {
+                                        // null-in field per ROW di sini
+                                     row.setQuantityOdoo(null);
+                                     row.setAddedValuePct(null);
+                                     row.setActive(null);
+                                     row.setBasePrice(null);
+                                     row.setStockPctToInj(null);
+                                     row.setLimitStock(null);
+                                     row.setMarginInjPct(null);
+                                     row.setPricingMode(null);
+
+
+                                    });
+                                }
                             });
                         }
-                        // resp.setSomething(null);
+
                         return resp;
                     })
                     .collect(Collectors.toList());
@@ -84,5 +104,4 @@ public class CatalogueController {
             return ResponseEntity.ok(list);
         }
     }
-}
 
