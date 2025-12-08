@@ -46,7 +46,8 @@ public class CatalogueController {
     @GetMapping("/inj-spec")
     public ResponseEntity<?> getInjSpec(
             @RequestParam(required = false) Long odooProductId,
-            @RequestParam(required = false) String sku
+            @RequestParam(required = false) String sku,
+            @RequestParam(required = false) String category
     ) {
 //        if (odooProductId != null) {
 //            // detail 1 produk
@@ -54,7 +55,7 @@ public class CatalogueController {
 //           // return ResponseEntity.ok(resp);
 //        } else {
             // list semua / difilter sku
-            List<ProductOdooInjSpecResponse> list = productInjSpecService.getAllSpec(sku)
+            List<ProductOdooInjSpecResponse> list = productInjSpecService.getAllSpec(category)
                     .stream()
                     .map(resp -> {
                         resp.setBrand(null);

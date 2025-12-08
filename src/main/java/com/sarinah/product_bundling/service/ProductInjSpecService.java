@@ -279,13 +279,13 @@ public class ProductInjSpecService {
     }
 
 
-    public List<ProductOdooInjSpecResponse> getAllSpec(String skuFilter) {
+    public List<ProductOdooInjSpecResponse> getAllSpec(String category) {
 
         List<CatalogOdooProduct> products;
 
-        if (skuFilter != null && !skuFilter.isBlank()) {
+        if (category != null && !category.isBlank()) {
             products = catalogueOdooProductRepository
-                    .findBySkuContainingIgnoreCase(skuFilter);
+                    .findByCategoryContainingIgnoreCase(category);
         } else {
             products = catalogueOdooProductRepository.findAll();
         }

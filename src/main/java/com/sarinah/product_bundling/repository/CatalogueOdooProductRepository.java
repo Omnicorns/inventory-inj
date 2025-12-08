@@ -19,6 +19,7 @@ public interface CatalogueOdooProductRepository extends JpaRepository<CatalogOdo
 
     List<CatalogOdooProduct> findByWarnaJenis(String warnaJenis);
     List<CatalogOdooProduct> findBySkuContainingIgnoreCase(String sku);
+    List<CatalogOdooProduct> findByCategoryContainingIgnoreCase(String keyword);
     Page<CatalogOdooProduct> findBySkuContainingIgnoreCaseOrNameContainingIgnoreCase(
             String sku,
             String name,
