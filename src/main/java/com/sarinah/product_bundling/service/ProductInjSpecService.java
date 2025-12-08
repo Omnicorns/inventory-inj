@@ -290,12 +290,22 @@ public class ProductInjSpecService {
             products = catalogueOdooProductRepository.findAll();
         }
 
+        Set<Long> seenTemplateIds = new HashSet<>();
+
         List<ProductOdooInjSpecResponse> result = new ArrayList<>();
+
         for (CatalogOdooProduct p : products) {
-            // pakai method yg sudah ada
-            ProductOdooInjSpecResponse spec = getSpecOdooForProduct(p.getOdooProductId());
-            result.add(spec);
+            Long templateId = p.getTemplateId();
+
+            // add() akan return true hanya saat pertama kali templateId itu muncul
+            if (seenTemplateIds.add(templateId)) {
+                // pakai salah satu varian sebagai anchor, boleh yang mana saja
+                ProductOdooInjSpecResponse spec =
+                        getSpecOdooForProduct(p.getOdooProductId());
+                result.add(spec);
+            }
         }
+
         return result;
     }
 
