@@ -1,9 +1,6 @@
 package com.sarinah.product_bundling.controller;
 
-import com.sarinah.product_bundling.model.response.InjSpecOdooRowResponse;
-import com.sarinah.product_bundling.model.response.ProductInjListRowResponse;
-import com.sarinah.product_bundling.model.response.ProductInjSpecResponse;
-import com.sarinah.product_bundling.model.response.ProductOdooInjSpecResponse;
+import com.sarinah.product_bundling.model.response.*;
 import com.sarinah.product_bundling.service.ProductInjSpecService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -15,7 +12,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Controller
 @RequiredArgsConstructor
@@ -29,18 +28,38 @@ public class CatalogueUiController {
      * GET /catalogue-ui/inj-spec?odooProductId=541486
      */
     @GetMapping("/inj-spec")
-    public String injSpecPage(@RequestParam Long odooProductId, Model model) {
+    public String injSpecPage(@RequestParam Long odooProductId,
+                              @RequestParam(required = false) Long locationId,
+                              Model model) {
+        ProductOdooInjSpecResponse spec =
+                productInjSpecService.getSpecOdooForProduct(odooProductId);
 
-       ProductOdooInjSpecResponse spec = productInjSpecService.getSpecOdooForProduct(odooProductId);
-        List<InjSpecOdooRowResponse> rows = spec.getVariants().stream()
-                .flatMap(v -> v.getRows().stream())   // gabung semua list rows
-                .toList();
+        // Cari variant yang sesuai dengan odooProductId yang diklik
+        VariantOdooInjSpecResponse selectedVariant = null;
+        if (spec.getVariants() != null && !spec.getVariants().isEmpty()) {
+            selectedVariant = spec.getVariants().stream()
+                    .filter(v -> odooProductId.equals(v.getVariantId()))
+                    .findFirst()
+                    // fallback: kalau tidak ketemu, pakai varian pertama (biar tidak NPE)
+                    .orElse(spec.getVariants().get(0));
+        }
 
-        model.addAttribute("spec", spec);
-        model.addAttribute("rows", rows);
-        model.addAttribute("odooProductId", odooProductId);
-        // templates/catalogue/inj-spec.html
+        // Lokasi yang ditampilkan hanya lokasi milik selectedVariant
+        List<InjSpecOdooRowResponse> rows =
+                (selectedVariant != null && selectedVariant.getRows() != null)
+                        ? selectedVariant.getRows()
+                        : Collections.emptyList();
+
+        model.addAttribute("spec", spec);                     // info template
+        model.addAttribute("rows", rows);                     // lokasi per product (variant) ini
+        model.addAttribute("selectedVariant", selectedVariant);
+        model.addAttribute("odooProductId", odooProductId);   // dipakai JS untuk /save/inj-spec/{id}
+
+        // templates/inj-spec.html
         return "inj-spec";
+
+
+
     }
 
     @GetMapping("/inj-spec-list")

@@ -129,25 +129,26 @@
         <div class="card-body d-flex align-items-center justify-content-between">
             <div class="d-flex align-items-center gap-3">
                 <div>
-                    <!-- ✅ gambar dari varian pertama (imageBase64) -->
-                    <img th:if="${!#lists.isEmpty(spec.variants) and spec.variants[0].imageBase64 != null}"
-                         th:src="'data:image/jpeg;base64,' + ${spec.variants[0].imageBase64}"
+                    <!-- ✅ gambar dari selectedVariant (product yang diklik) -->
+                    <img th:if="${selectedVariant != null and selectedVariant.imageBase64 != null}"
+                         th:src="'data:image/jpeg;base64,' + ${selectedVariant.imageBase64}"
                          alt="Product Image"
                          class="product-img border"/>
 
-                    <div th:if="${#lists.isEmpty(spec.variants) || spec.variants[0].imageBase64 == null}"
+                    <div th:if="${selectedVariant == null || selectedVariant.imageBase64 == null}"
                          class="product-img d-flex align-items-center justify-content-center text-muted">
                         No Image
                     </div>
                 </div>
                 <div>
                     <div class="text-muted mb-1" style="font-size: 0.8rem;">INJ SPECIFICATION</div>
+                    <!-- Nama template tetap pakai spec (nama umum produk) -->
                     <h5 class="mb-1" th:text="${spec.templateName}">Nama Produk</h5>
 
                     <div class="text-muted">
                         SKU:
                         <span class="fw-semibold"
-                              th:text="${#lists.isEmpty(spec.variants) ? 'N/A' : spec.variants[0].sku}">
+                              th:text="${selectedVariant == null ? 'N/A' : selectedVariant.sku}">
                             SKU-XXX
                         </span>
                         &nbsp;&nbsp;|&nbsp;&nbsp;
@@ -201,7 +202,13 @@
     <div class="card">
         <!-- HEADER TABEL SEDERHANA -->
         <div class="card-header">
-            <div class="fw-semibold">Konfigurasi per Lokasi</div>
+            <div class="fw-semibold">
+                Konfigurasi per Lokasi
+                <!-- focusLocationId boleh dibiarkan, kalau tidak dipakai ya selalu null -->
+                <span th:if="${focusLocationId != null}" class="badge bg-info ms-2">
+                    Difilter per lokasi
+                </span>
+            </div>
             <div class="text-muted small">
                 Atur limit stock, mode harga, dan harga jual untuk tiap lokasi.
             </div>
@@ -318,7 +325,7 @@
 <script th:inline="javascript">
     const API_BASE = /*[[@{/sarinah-forwarder/v1/catalogue}]]*/ "/sarinah-forwarder/v1/catalogue";
 
-    // ✅ sekarang pakai odooProductId dari controller, BUKAN variantId
+    // ✅ pakai odooProductId dari controller
     const ODOO_PRODUCT_ID = /*[[${odooProductId}]]*/ 0;
 
     function formatNumberId(n) {
