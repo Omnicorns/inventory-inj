@@ -5,6 +5,8 @@ import com.sarinah.product_bundling.model.request.InjSpecRowUpdateRequest;
 import com.sarinah.product_bundling.model.response.*;
 import com.sarinah.product_bundling.repository.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -19,6 +21,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ProductInjSpecService {
     private final CatalogueProductRepository catalogueProductRepository;
     private final CatalogueProductStockRepository catalogueProductStockRepository;
@@ -278,8 +281,15 @@ public class ProductInjSpecService {
 
     }
 
-
+    @Cacheable(
+            value = "all-specs",
+            key = "#category != null ? #category : 'all'"
+    )
     public List<ProductOdooInjSpecResponse> getAllSpec(String category) {
+        long startTime = System.currentTimeMillis(); // ⬅️ START
+
+        log.info("🔍 CACHE MISS - Building specs untuk: {}", category);
+
 
         List<CatalogOdooProduct> products;
 
@@ -305,7 +315,8 @@ public class ProductInjSpecService {
                 result.add(spec);
             }
         }
-
+        long duration = System.currentTimeMillis() - startTime;
+        log.info("✅ Selesai build {} specs (waktu: {}ms)", result.size(), duration);
         return result;
     }
 
