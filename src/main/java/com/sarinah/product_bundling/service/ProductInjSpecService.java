@@ -1,5 +1,7 @@
 package com.sarinah.product_bundling.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sarinah.product_bundling.model.entity.*;
 import com.sarinah.product_bundling.model.request.InjSpecRowUpdateRequest;
 import com.sarinah.product_bundling.model.response.*;
@@ -283,7 +285,7 @@ public class ProductInjSpecService {
 
     @Cacheable(
             value = "all-specs",
-            key = "#category != null ? #category : 'all'"
+            key = "#category != null && !#category.isBlank() ? #category.toLowerCase().trim() : 'all'"
     )
     public List<ProductOdooInjSpecResponse> getAllSpec(String category) {
         long startTime = System.currentTimeMillis(); // ⬅️ START
@@ -312,6 +314,12 @@ public class ProductInjSpecService {
                 // pakai salah satu varian sebagai anchor, boleh yang mana saja
                 ProductOdooInjSpecResponse spec =
                         getSpecOdooForProduct(p.getOdooProductId());
+                spec.setBrand(null);
+                spec.setOwnerId(null);
+                spec.setProductId(spec.getTemplateId());
+                spec.setProductName(spec.getTemplateName());
+                spec.setTemplateId(null);
+                spec.setTemplateName(null);
                 result.add(spec);
             }
         }

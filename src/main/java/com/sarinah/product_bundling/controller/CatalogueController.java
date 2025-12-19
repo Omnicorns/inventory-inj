@@ -58,12 +58,7 @@ public class CatalogueController {
             List<ProductOdooInjSpecResponse> list = productInjSpecService.getAllSpec(category)
                     .stream()
                     .map(resp -> {
-                        resp.setBrand(null);
-                        resp.setOwnerId(null);
-                        resp.setProductId(resp.getTemplateId());
-                        resp.setProductName(resp.getTemplateName());
-                        resp.setTemplateId(null);
-                        resp.setTemplateName(null);
+
 
                         // (opsional) kalau ada field template yang mau di-null-kan
                         // resp.setOwnerId(null);
