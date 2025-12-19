@@ -179,7 +179,7 @@ public class PostSaveCatalogueProductService {
     public void scheduledExecute() {
         try {
             log.info("Start sync catalogue product_inj (scheduler)");
-            execute();
+    //        execute();
             log.info("Finish sync catalogue product_inj");
         } catch (Exception e) {
             log.error("Error saat sync catalogue product_inj (scheduler)", e);
