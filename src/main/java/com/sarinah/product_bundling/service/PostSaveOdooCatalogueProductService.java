@@ -1,5 +1,7 @@
 package com.sarinah.product_bundling.service;
 
+
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sarinah.product_bundling.adaptor.SarinahGetModulAdaptor;
@@ -23,11 +25,17 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class PostSaveOdooCatalogueProductService {
-    private final ObjectMapper objectMapper;
+    private final ObjectMapper objectMapper; // biarin kalau memang dipakai di tempat lain
     private final SarinahGetModulAdaptor sarinahGetModulAdaptor;
     private final CatalogueOdooProductRepository catalogueProductRepository;
 
-
+    /**
+     * Goal: cegah DB bengkak tanpa rombak besar:
+     * - Jangan update/save kalau tidak ada perubahan
+     * - syncedAt hanya berubah kalau ada perubahan
+     * - imageBase64 hanya di-set kalau berubah
+     * - stocks dan attributes hanya diubah kalau beda (minimal)
+     */
     @Transactional
     public void execute() {
         JsonNode root = sarinahGetModulAdaptor.getCatalogueCart();
@@ -37,26 +45,24 @@ public class PostSaveOdooCatalogueProductService {
             return;
         }
 
-        List<CatalogOdooProduct> toSave = new ArrayList<>();
+        int savedCount = 0;
 
         for (JsonNode templateNode : root) {
-            Long templateId   = templateNode.path("template_id").isNumber()
+            Long templateId = templateNode.path("template_id").isNumber()
                     ? templateNode.get("template_id").asLong()
                     : null;
             String templateName = templateNode.path("template_name").asText(null);
-            String category     = templateNode.path("category").asText(null);
-            String brand        = templateNode.path("brand").asText(null);
-            String owner        = templateNode.path("owner_id").asText(null);
-            String productType = templateNode.path("product_type").asText(null);
+            String category = templateNode.path("category").asText(null);
+            String brand = templateNode.path("brand").asText(null);
+            String owner = templateNode.path("owner_id").asText(null);
+            String productType = templateNode.path("product_type").asText(null); // kalau dipakai di entity nanti
 
             JsonNode variants = templateNode.get("variants");
-            if (variants == null || !variants.isArray()) {
-                continue;
-            }
+            if (variants == null || !variants.isArray()) continue;
 
             for (JsonNode variantNode : variants) {
                 try {
-                    CatalogOdooProduct product = upsertVariantNode(
+                    boolean saved = upsertVariantNode(
                             templateId,
                             templateName,
                             category,
@@ -64,24 +70,20 @@ public class PostSaveOdooCatalogueProductService {
                             owner,
                             variantNode
                     );
-                    if (product != null) {
-                        toSave.add(product);
-                    }
+                    if (saved) savedCount++;
                 } catch (Exception e) {
                     log.warn("Gagal memproses variant node: {}", variantNode, e);
                 }
             }
         }
 
-        if (!toSave.isEmpty()) {
-            catalogueProductRepository.saveAll(toSave);
-            log.info("Catalogue sync: {} produk berhasil disimpan/diupdate", toSave.size());
-        } else {
-            log.info("Catalogue sync: tidak ada produk yang tersimpan");
-        }
+        log.info("Catalogue sync: {} produk tersimpan/ter-update (hanya yang berubah)", savedCount);
     }
 
-    private CatalogOdooProduct upsertVariantNode(
+    /**
+     * @return true kalau ada perubahan dan dilakukan save
+     */
+    private boolean upsertVariantNode(
             Long templateId,
             String templateName,
             String category,
@@ -90,21 +92,31 @@ public class PostSaveOdooCatalogueProductService {
             JsonNode node
     ) {
         Long odooId = node.path("id").isNumber() ? node.get("id").asLong() : null;
-        if (odooId == null) {
-            return null;
-        }
+        if (odooId == null) return false;
 
         CatalogOdooProduct product = catalogueProductRepository
                 .findByOdooProductId(odooId)
                 .orElseGet(CatalogOdooProduct::new);
 
-        fillHeader(product, templateId, templateName, category, brand, owner, odooId, node);
-        syncStocks(product, node.get("stock_by_location"));
+        boolean changed = false;
 
-        return product;
+        changed |= fillHeaderIfChanged(product, templateId, templateName, category, brand, owner, odooId, node);
+        changed |= syncAttributesIfChanged(product, node.path("attributes"));
+        changed |= syncStocksIfChanged(product, node.get("stock_by_location"));
+
+        if (changed) {
+            product.setSyncedAt(Instant.now()); // syncedAt hanya berubah kalau memang ada perubahan
+            catalogueProductRepository.save(product);
+            return true;
+        }
+
+        return false;
     }
 
-    private void fillHeader(
+    /**
+     * Header: set field hanya kalau beda.
+     */
+    private boolean fillHeaderIfChanged(
             CatalogOdooProduct product,
             Long templateId,
             String templateName,
@@ -114,88 +126,154 @@ public class PostSaveOdooCatalogueProductService {
             Long odooId,
             JsonNode node
     ) {
-        String sku     = node.path("default_code").asText(null);
-        String name    = node.path("name").asText(null);
-        String barcode = node.path("barcode").asText(null);
+        boolean changed = false;
 
+        String sku = node.path("default_code").asText(null);
+        String name = node.path("name").asText(null);
+        String barcode = node.path("barcode").asText(null);
         BigDecimal listPrice = asBigDecimal(node.get("list_price"));
 
-        // handle image: bisa false atau base64
+        // handle image: bisa false / true / base64 string
         JsonNode imageNode = node.get("image");
-        boolean hasImage = false;
-        String imageBase64 = null;
+        boolean hasImagePayload = false;
+        String imageBase64Payload = null;
 
         if (imageNode != null && !imageNode.isNull()) {
             if (imageNode.isBoolean()) {
-                hasImage = imageNode.asBoolean(false);
+                hasImagePayload = imageNode.asBoolean(false);
             } else if (imageNode.isTextual()) {
                 String img = imageNode.asText();
                 if (img != null && !img.isBlank() && !"false".equalsIgnoreCase(img)) {
-                    hasImage = true;
-                    imageBase64 = img;
+                    hasImagePayload = true;
+                    imageBase64Payload = img;
                 }
             }
         }
 
-        // baca attr "Warna / Jenis"
-        List<CatalogOdooProductAttribute> attrEntities = new ArrayList<>();
-        product.clearAttributes();
+        // odoo id
+        if (!Objects.equals(product.getOdooProductId(), odooId)) {
+            product.setOdooProductId(odooId);
+            changed = true;
+        }
 
-        JsonNode attrs = node.path("attributes");
-        if (attrs != null && attrs.isArray()) {
-            for (JsonNode attrNode : attrs) {
-                String attrName  = attrNode.path("attribute").asText(null);
+        // basic fields
+        changed |= setIfDiffString(product.getSku(), sku, product::setSku);
+        changed |= setIfDiffString(product.getName(), name, product::setName);
+        changed |= setIfDiffString(product.getBarcode(), barcode, product::setBarcode);
+        changed |= setIfDiffBigDecimal(product.getListPrice(), listPrice, product::setListPrice);
+
+        // hasImage
+        Boolean oldHasImage = product.getHasImage(); // bisa null
+        changed |= setIfDiffBoolNullable(oldHasImage, hasImagePayload, product::setHasImage);
+
+
+        // imageBase64: HANYA set kalau beda (biar tidak update besar tiap menit)
+        // Jika payload tidak punya base64 (false), defaultnya kita BIARKAN base64 lama tetap ada.
+        // Kalau kamu ingin hapus image saat payload false, lihat bagian "hapus" di bawah.
+        if (hasImagePayload && imageBase64Payload != null) {
+            if (!Objects.equals(product.getImageBase64(), imageBase64Payload)) {
+                product.setImageBase64(imageBase64Payload);
+                changed = true;
+            }
+        } else {
+            // Default: jangan overwrite jadi null, supaya tidak bolak-balik update.
+            // Kalau memang Odoo selalu kirim false untuk yang tidak punya image dan kamu ingin bersih:
+            /*
+            if (product.getImageBase64() != null) {
+                product.setImageBase64(null);
+                changed = true;
+            }
+            */
+        }
+
+        // meta template
+        changed |= setIfDiffLong(product.getTemplateId(), templateId, product::setTemplateId);
+        changed |= setIfDiffString(product.getTemplateName(), templateName, product::setTemplateName);
+        changed |= setIfDiffString(product.getCategory(), category, product::setCategory);
+        changed |= setIfDiffString(product.getBrand(), brand, product::setBrand);
+        changed |= setIfDiffString(product.getOwner(), owner, product::setOwner);
+
+        return changed;
+    }
+
+    /**
+     * Attributes: agar tidak "clear + insert" tiap menit (itu bikin bloat juga),
+     * kita bandingkan snapshot sederhana dulu. Jika sama, tidak ubah apa-apa.
+     */
+    private boolean syncAttributesIfChanged(CatalogOdooProduct product, JsonNode attrsNode) {
+        // build snapshot baru dari payload: urutkan supaya stabil
+        List<String> newSnapshot = new ArrayList<>();
+
+        if (attrsNode != null && attrsNode.isArray()) {
+            for (JsonNode attrNode : attrsNode) {
+                String attrName = attrNode.path("attribute").asText(null);
                 String attrValue = attrNode.path("value").asText(null);
-                String display   = attrNode.path("display_name").asText(null);
+                String display = attrNode.path("display_name").asText(null);
 
-                // kalau display_name kosong tapi name & value ada → bikin sendiri
-                if ((display == null || display.isBlank())
-                        && attrName != null && attrValue != null) {
+                if ((display == null || display.isBlank()) && attrName != null && attrValue != null) {
                     display = attrName + ": " + attrValue;
                 }
 
-                // skip kalau benar-benar kosong semua
-                if (attrName == null && attrValue == null && display == null) {
-                    continue;
-                }
+                if (attrName == null && attrValue == null && display == null) continue;
 
-                // buat entity attribute child
+                // snapshot string
+                newSnapshot.add(
+                        String.valueOf(attrName) + "|" + String.valueOf(attrValue) + "|" + String.valueOf(display)
+                );
+            }
+        }
+
+        Collections.sort(newSnapshot);
+
+        // snapshot existing dari entity: juga urutkan
+        List<String> oldSnapshot = new ArrayList<>();
+        if (product.getAttributes() != null) {
+            for (CatalogOdooProductAttribute a : product.getAttributes()) {
+                oldSnapshot.add(
+                        String.valueOf(a.getAttributeName()) + "|" + String.valueOf(a.getValue()) + "|" + String.valueOf(a.getDisplayName())
+                );
+            }
+        }
+        Collections.sort(oldSnapshot);
+
+        // kalau sama persis -> tidak ada perubahan
+        if (oldSnapshot.equals(newSnapshot)) {
+            return false;
+        }
+
+        // beda -> baru rebuild (ini perubahan minimal tapi tidak setiap menit)
+        product.clearAttributes();
+
+        if (!newSnapshot.isEmpty() && attrsNode != null && attrsNode.isArray()) {
+            for (JsonNode attrNode : attrsNode) {
+                String attrName = attrNode.path("attribute").asText(null);
+                String attrValue = attrNode.path("value").asText(null);
+                String display = attrNode.path("display_name").asText(null);
+
+                if ((display == null || display.isBlank()) && attrName != null && attrValue != null) {
+                    display = attrName + ": " + attrValue;
+                }
+                if (attrName == null && attrValue == null && display == null) continue;
+
                 CatalogOdooProductAttribute attrEntity = new CatalogOdooProductAttribute();
-                attrEntity.setProduct(product);          // 🔴 ini penting buat relasi
+                attrEntity.setProduct(product);
                 attrEntity.setAttributeName(attrName);
                 attrEntity.setValue(attrValue);
                 attrEntity.setDisplayName(display);
 
-
                 product.addAttribute(attrEntity);
-
-                // sambil isi warnaJenis kalau ketemu "Warna / Jenis"
-
             }
         }
 
-// se
-
-        product.setOdooProductId(odooId);
-        product.setSku(sku);
-        product.setName(name);
-        product.setBarcode(barcode);
-        product.setListPrice(listPrice);
-        product.setHasImage(hasImage);
-        product.setImageBase64(imageBase64);
-
-        product.setSyncedAt(Instant.now());
-
-        // meta template
-        product.setTemplateId(templateId);
-        product.setTemplateName(templateName);
-        product.setCategory(category);
-        product.setBrand(brand);
-        product.setOwner(owner);
-        //product.setWarnaJenis(warnaJenis);
+        return true;
     }
 
-    private void syncStocks(CatalogOdooProduct product, JsonNode stockByLocation) {
+    /**
+     * Stocks: update hanya kalau beda, hapus hanya kalau beda.
+     */
+    private boolean syncStocksIfChanged(CatalogOdooProduct product, JsonNode stockByLocation) {
+        boolean changed = false;
+
         if (product.getStocks() == null) {
             product.setStocks(new ArrayList<>());
         }
@@ -214,16 +292,14 @@ public class PostSaveOdooCatalogueProductService {
             while (fieldNames.hasNext()) {
                 String field = fieldNames.next();
                 JsonNode locNode = stockByLocation.get(field);
-                if (locNode == null || locNode.isNull()) {
-                    continue;
-                }
+                if (locNode == null || locNode.isNull()) continue;
 
-                Long locationId      = locNode.path("id").asLong();
-                String locationName  = locNode.path("location").asText(null);
+                Long locationId = locNode.path("id").asLong();
+                String locationName = locNode.path("location").asText(null);
                 String pricelistName = locNode.path("pricelist_name").asText(null);
-                BigDecimal quantity  = asBigDecimal(locNode.get("quantity"));
-                String uom           = locNode.path("uom").asText(null);
-                BigDecimal price     = asBigDecimal(locNode.get("price"));
+                BigDecimal quantity = asBigDecimal(locNode.get("quantity"));
+                String uom = locNode.path("uom").asText(null);
+                BigDecimal price = asBigDecimal(locNode.get("price"));
 
                 String key = stockKey(locationId, pricelistName);
                 seenKeys.add(key);
@@ -233,21 +309,30 @@ public class PostSaveOdooCatalogueProductService {
                     stock = new CatalogueOdooProductStock();
                     stock.setProduct(product);
                     product.getStocks().add(stock);
+                    changed = true; // insert row baru
                 }
 
-                stock.setLocationId(locationId);
-                stock.setLocationName(locationName);
-                stock.setPricelistName(pricelistName);
-                stock.setQuantity(quantity);
-                stock.setUom(uom);
-                stock.setPrice(price);
+                if (!Objects.equals(stock.getLocationId(), locationId)) {
+                    stock.setLocationId(locationId);
+                    changed = true;
+                }
+                changed |= setIfDiffString(stock.getLocationName(), locationName, stock::setLocationName);
+                changed |= setIfDiffString(stock.getPricelistName(), pricelistName, stock::setPricelistName);
+                changed |= setIfDiffBigDecimal(stock.getQuantity(), quantity, stock::setQuantity);
+                changed |= setIfDiffString(stock.getUom(), uom, stock::setUom);
+                changed |= setIfDiffBigDecimal(stock.getPrice(), price, stock::setPrice);
             }
         }
 
-        // hapus stok yang tidak ada lagi di payload
+        int before = product.getStocks().size();
         product.getStocks().removeIf(s ->
                 !seenKeys.contains(stockKey(s.getLocationId(), s.getPricelistName()))
         );
+        if (product.getStocks().size() != before) {
+            changed = true;
+        }
+
+        return changed;
     }
 
     private String stockKey(Long locationId, String pricelistName) {
@@ -255,17 +340,11 @@ public class PostSaveOdooCatalogueProductService {
     }
 
     private BigDecimal asBigDecimal(JsonNode node) {
-        if (node == null || node.isNull()) {
-            return null;
-        }
-        if (node.isNumber()) {
-            return node.decimalValue();
-        }
+        if (node == null || node.isNull()) return null;
+        if (node.isNumber()) return node.decimalValue();
         if (node.isTextual()) {
             String text = node.asText();
-            if (text == null || text.isBlank()) {
-                return null;
-            }
+            if (text == null || text.isBlank()) return null;
             try {
                 return new BigDecimal(text);
             } catch (NumberFormatException e) {
@@ -276,8 +355,52 @@ public class PostSaveOdooCatalogueProductService {
         return null;
     }
 
+    // ======= Helpers: set only if different =======
+    private boolean setIfDiffString(String oldVal, String newVal, java.util.function.Consumer<String> setter) {
+        if (!Objects.equals(oldVal, newVal)) {
+            setter.accept(newVal);
+            return true;
+        }
+        return false;
+    }
 
+    private boolean setIfDiffBool(boolean oldVal, boolean newVal, java.util.function.Consumer<Boolean> setter) {
+        if (oldVal != newVal) {
+            setter.accept(newVal);
+            return true;
+        }
+        return false;
+    }
 
+    private boolean setIfDiffLong(Long oldVal, Long newVal, java.util.function.Consumer<Long> setter) {
+        if (!Objects.equals(oldVal, newVal)) {
+            setter.accept(newVal);
+            return true;
+        }
+        return false;
+    }
+
+    private boolean setIfDiffBigDecimal(BigDecimal oldVal, BigDecimal newVal, java.util.function.Consumer<BigDecimal> setter) {
+        if (oldVal == null && newVal == null) return false;
+        if (oldVal == null || newVal == null) {
+            setter.accept(newVal);
+            return true;
+        }
+        if (oldVal.compareTo(newVal) != 0) {
+            setter.accept(newVal);
+            return true;
+        }
+        return false;
+    }
+
+    private boolean setIfDiffBoolNullable(Boolean oldVal, boolean newVal, java.util.function.Consumer<Boolean> setter) {
+        boolean old = oldVal != null && oldVal; // null dianggap false
+        if (old != newVal) {
+            setter.accept(newVal);
+            return true;
+        }
+        return false;
+    }
 
     @Scheduled(cron = "0 */1 * * * *", zone = "Asia/Jakarta")
     @Transactional
@@ -290,5 +413,4 @@ public class PostSaveOdooCatalogueProductService {
             log.error("Error saat sync catalogue product_inj (scheduler)", e);
         }
     }
-
 }
