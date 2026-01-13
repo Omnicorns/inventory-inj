@@ -1,4 +1,4 @@
-package com.sarinah.tenantsalesomzet.configuration;
+package com.sarinah.product_bundling.configuration;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
