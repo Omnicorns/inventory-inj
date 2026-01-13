@@ -5,6 +5,7 @@ import com.sarinah.product_bundling.model.entity.CatalogOdooProduct;
 import com.sarinah.product_bundling.model.entity.CatalogueProduct;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -25,6 +26,9 @@ public interface CatalogueOdooProductRepository extends JpaRepository<CatalogOdo
             String name,
             Pageable pageable
     );
+
+    @EntityGraph(attributePaths = {"attributes"}) // ONLY ONE BAG
+    Optional<CatalogOdooProduct> findGraphByOdooProductId(Long odooProductId);
 
 
 }
