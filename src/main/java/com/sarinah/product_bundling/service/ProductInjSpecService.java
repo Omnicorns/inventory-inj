@@ -66,6 +66,7 @@ public class ProductInjSpecService {
                 limitStock = BigDecimal.ZERO;
             }
 
+
             // sellStock = max(qtyOdoo - limitStock, 0)
             BigDecimal sellStock = qtyOdoo.subtract(limitStock);
             if (sellStock.compareTo(BigDecimal.ZERO) < 0) {
@@ -465,8 +466,8 @@ public class ProductInjSpecService {
                 .orElse(null);
 
         ProductOdooInjSpecResponse resp = new ProductOdooInjSpecResponse();
-        resp.setTemplateId(product.getOdooProductId());      // atau product.getTemplateId()
-        resp.setTemplateName(product.getName());
+        resp.setTemplateId(product.getTemplateId());      // atau product.getTemplateId()
+        resp.setTemplateName(product.getTemplateName());
         resp.setImage(product.getHasImage() != null && product.getHasImage());
         // resp.setCategory(...);
         // resp.setBrand(...);

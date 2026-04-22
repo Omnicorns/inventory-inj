@@ -4,303 +4,611 @@
       xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head>
   <meta charset="UTF-8">
-  <title>INJ Specification - Product List</title>
+  <title>INJ Spec List - Catalogue</title>
 
   <link rel="stylesheet"
         href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"/>
 
   <style>
     body {
-        background: radial-gradient(circle at top left, #e0f7ff 0, #f5f7fb 40%, #f2f4ff 100%);
+        background: #f5f7fb;
         font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
-    .page-wrap {
-        max-width: 1200px;
-        margin: 32px auto 40px;
-    }
+    .page-wrap { max-width: 1400px; margin: 24px auto; }
     .card {
-        border-radius: 18px;
-        border: 1px solid #e2e5f2;
-        box-shadow: 0 18px 45px rgba(15, 23, 42, .08);
+        border-radius: 16px;
+        border: 1px solid #e1e4ef;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, .07);
     }
-    .card-header {
-        border-bottom: 1px solid rgba(226, 229, 242, 0.8);
-        background: linear-gradient(135deg, #ffffff 0, #f7f8ff 100%);
-        border-radius: 18px 18px 0 0 !important;
+    .product-thumb {
+        width: 56px; height: 56px;
+        border-radius: 8px; object-fit: cover;
+        background: #f0f2f8;
     }
-    .pill-stat {
-        padding: 2px 10px;
-        border-radius: 999px;
-        font-size: 0.75rem;
-        background: #eef2ff;
-        color: #4338ca;
-    }
-    .search-wrap {
-        border-radius: 999px;
-        border: 1px solid #d4d7e8;
-        padding: 4px 12px;
-        background: #fff;
-    }
-    .search-wrap input {
-        border: none;
-        box-shadow: none;
-        font-size: 0.9rem;
-    }
-    .search-wrap input:focus {
-        outline: none;
-        box-shadow: none;
+    .product-thumb-placeholder {
+        width: 56px; height: 56px;
+        border-radius: 8px;
+        background: #f0f2f8;
+        display: flex; align-items: center; justify-content: center;
+        color: #9ca3af; font-size: 0.7rem;
     }
     .table thead th {
-        font-size: 0.75rem;
+        background: #fafbff;
+        border-bottom: 2px solid #e1e4ef;
+        font-weight: 600;
+        font-size: 0.82rem;
+        color: #4b5563;
         text-transform: uppercase;
-        letter-spacing: .06em;
-        background: #f9fafb;
-        border-bottom: 1px solid #e5e7eb;
+        letter-spacing: .04em;
     }
-    .table tbody td {
-        vertical-align: middle;
+    .table thead th.has-tooltip {
+        cursor: help;
+        border-bottom-style: dashed;
+        border-bottom-width: 2px;
+        border-bottom-color: #cbd5e1;
+    }
+    .table td { vertical-align: middle; }
+    .btn-open-spec {
+        font-size: 0.8rem;
+        padding: 4px 12px;
+    }
+
+    /* ====== Parent row (template) ====== */
+    .template-row {
+        background: #f8faff;
+        cursor: pointer;
+        user-select: none;
+        transition: background .15s;
+    }
+    .template-row:hover {
+        background: #eef2ff;
+    }
+    .template-row td {
+        font-weight: 600;
+        border-top: 2px solid #e1e4ef;
+    }
+    .template-chev {
+        display: inline-block;
+        width: 16px;
+        transition: transform .2s;
+        color: #64748b;
+        margin-right: 6px;
+    }
+    .template-row.collapsed .template-chev {
+        transform: rotate(-90deg);
+    }
+    .template-variant-count {
+        display: inline-block;
+        background: #dbeafe;
+        color: #1e40af;
+        font-size: 0.7rem;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-weight: 600;
+        margin-left: 6px;
+    }
+
+    /* ====== Child row (variant) ====== */
+    .variant-row td {
+        background: #fff;
+        font-weight: normal;
         font-size: 0.88rem;
     }
-    .sku-text {
-        font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-        font-size: 0.78rem;
-        padding: 2px 6px;
-        border-radius: 6px;
+    .variant-row td:first-child {
+        padding-left: 48px;   /* indent biar keliatan child */
+    }
+    .variant-row.d-none {
+        display: none;
+    }
+    .variant-attr {
+        color: #4338ca;
+        font-weight: 600;
         background: #eef2ff;
-        color: #3730a3;
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-size: 0.82rem;
     }
-    .btn-config {
+
+    /* ====== Status badge ====== */
+    .status-badge {
+        display: inline-block;
+        font-size: 0.72rem;
+        font-weight: 600;
+        padding: 4px 10px;
         border-radius: 999px;
-        padding-inline: 16px;
-        font-size: 0.85rem;
+        letter-spacing: .02em;
+        white-space: nowrap;
     }
-    .pagination .page-link {
-        border-radius: 999px !important;
-        margin: 0 2px;
-        font-size: 0.8rem;
+    .status-belum    { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+    .status-sebagian { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+    .status-aktif    { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+
+    /* ====== Ratio cell ====== */
+    .ratio-cell {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 2px;
+        font-weight: 600;
+        font-size: 0.95rem;
     }
+    .ratio-active  { color: #047857; }
+    .ratio-partial { color: #b45309; }
+    .ratio-none    { color: #94a3b8; }
+    .ratio-sep     { color: #cbd5e1; font-weight: 400; margin: 0 2px; }
+    .ratio-total   { color: #64748b; font-weight: 500; font-size: 0.85rem; }
+
+    .filter-bar {
+        display: flex; gap: 12px;
+        align-items: end; flex-wrap: wrap;
+    }
+    .filter-bar .form-label {
+        font-size: 0.75rem; color: #6b7280;
+        margin-bottom: 4px; font-weight: 500;
+    }
+    .pagination-info { font-size: 0.82rem; color: #6b7280; }
     .empty-state {
-        padding: 48px 16px;
-        text-align: center;
-        color: #6b7280;
+        padding: 60px 20px;
+        text-align: center; color: #9ca3af;
+    }
+    .legend-box {
+        display: flex; gap: 16px; flex-wrap: wrap;
+        font-size: 0.78rem; color: #4b5563;
+    }
+    .legend-item {
+        display: inline-flex; align-items: center; gap: 6px;
+    }
+    .btn-expand-all {
+        font-size: 0.78rem;
     }
   </style>
 </head>
 <body>
-
 <div class="page-wrap">
 
-  <!-- BAR USER SESSION + LOGOUT -->
-  <div class="d-flex justify-content-between align-items-center mb-2 small">
+  <!-- BAR USER -->
+  <div class="d-flex justify-content-between align-items-center mb-3 small">
     <div>
       Login sebagai:
       <strong sec:authentication="name">user</strong>
     </div>
     <form th:action="@{/logout}" method="post" class="m-0">
-      <button type="submit" class="btn btn-link btn-sm p-0">
-        Logout
-      </button>
+      <button type="submit" class="btn btn-link btn-sm p-0">Logout</button>
     </form>
   </div>
 
-  <!-- HEADER -->
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <div>
-      <h4 class="mb-1">INJ Specification</h4>
-      <div class="text-muted small">
-        Kelola aturan harga & stok per produk untuk channel INJ.
+  <!-- HEADER + LEGEND -->
+  <div class="card mb-3">
+    <div class="card-body">
+      <h5 class="mb-1">📦 INJ Specification List</h5>
+      <div class="text-muted small mb-3">
+        Produk dikelompokkan berdasarkan template. Klik baris template untuk melihat semua varian-nya.
       </div>
-    </div>
-    <div class="text-end">
-      <span class="pill-stat">
-        <span th:text="${page.totalElements}">0</span> produk terdaftar
-      </span>
+
+      <div class="legend-box">
+        <div class="legend-item">
+          <span class="status-badge status-belum">Belum Disetup</span>
+          <span class="text-muted">Belum ada lokasi aktif</span>
+        </div>
+        <div class="legend-item">
+          <span class="status-badge status-sebagian">Sebagian Aktif</span>
+          <span class="text-muted">Sebagian lokasi aktif</span>
+        </div>
+        <div class="legend-item">
+          <span class="status-badge status-aktif">Aktif Semua</span>
+          <span class="text-muted">Semua lokasi aktif</span>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- FILTER & TABLE CARD -->
-  <div class="card">
-    <div class="card-header py-3 px-4">
-      <form class="row g-2 align-items-center"
-            th:action="@{/catalogue-ui/inj-spec-list}"
-            method="get">
-
-        <!-- Search SKU / nama -->
-        <div class="col-md-5">
-          <div class="search-wrap d-flex align-items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
-                 fill="none" viewBox="0 0 24 24" stroke="#6b7280">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                    d="m21 21-4.35-4.35m0 0A7.5 7.5 0 1 0 5.64 5.64a7.5 7.5 0 0 0 10.99 10.99Z"/>
-            </svg>
-            <input type="text"
-                   name="q"
-                   class="form-control form-control-sm bg-transparent"
-                   placeholder="Cari nama template / brand..."
-                   th:value="${q}">
-          </div>
-        </div>
-
-        <!-- (Opsional) Filter lain, kalau masih dipakai -->
-        <div class="col-md-3">
-          <input type="text"
-                 name="category"
+  <!-- FILTER BAR -->
+  <div class="card mb-3">
+    <div class="card-body">
+      <form th:action="@{/catalogue-ui/inj-spec-list}" method="get" class="filter-bar">
+        <div class="flex-grow-1" style="min-width: 240px;">
+          <label class="form-label">Cari (SKU atau Nama Template)</label>
+          <input type="text" name="q"
+                 th:value="${q}"
                  class="form-control form-control-sm"
-                 placeholder="Filter kategori (opsional)"
-                 th:value="${category}">
+                 placeholder="Contoh: TAS-001 atau Dummy Kemeja"/>
         </div>
 
-        <!-- Page size -->
-        <div class="col-md-2">
-          <select name="size" class="form-select form-select-sm">
-            <option th:value="10" th:selected="${size == 10}">10 / halaman</option>
-            <option th:value="20" th:selected="${size == 20}">20 / halaman</option>
-            <option th:value="50" th:selected="${size == 50}">50 / halaman</option>
+        <div style="min-width: 200px;">
+          <label class="form-label">Filter Lokasi</label>
+          <select name="locationId" class="form-select form-select-sm">
+            <option value="">Semua Lokasi</option>
+            <option th:each="loc : ${locations}"
+                    th:value="${loc.id}"
+                    th:text="${loc.name}"
+                    th:selected="${locationId != null and locationId == loc.id}">
+              Lokasi
+            </option>
           </select>
         </div>
 
-        <div class="col-md-2 text-end">
-          <button type="submit" class="btn btn-primary btn-sm px-4">
-            Terapkan
-          </button>
+        <div style="min-width: 100px;">
+          <label class="form-label">Per Halaman</label>
+          <select name="size" class="form-select form-select-sm">
+            <option value="20"  th:selected="${size == 20}">20</option>
+            <option value="50"  th:selected="${size == 50}">50</option>
+            <option value="100" th:selected="${size == 100}">100</option>
+            <option value="200" th:selected="${size == 200}">200</option>
+          </select>
+        </div>
+
+        <input type="hidden" name="page" value="0"/>
+
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary btn-sm px-3">🔍 Cari</button>
+          <a th:href="@{/catalogue-ui/inj-spec-list}"
+             class="btn btn-outline-secondary btn-sm">Reset</a>
         </div>
       </form>
     </div>
+  </div>
+
+  <!-- TABLE PRODUK -->
+  <div class="card">
+    <!-- Toolbar expand/collapse -->
+    <div th:if="${page != null and !#lists.isEmpty(page.content)}"
+         class="d-flex justify-content-end gap-2 px-3 pt-3">
+      <button type="button" class="btn btn-outline-secondary btn-expand-all" id="btnExpandAll">
+        ↓ Expand Semua
+      </button>
+      <button type="button" class="btn btn-outline-secondary btn-expand-all" id="btnCollapseAll">
+        ↑ Collapse Semua
+      </button>
+    </div>
 
     <div class="card-body p-0">
+      <div th:if="${page == null or #lists.isEmpty(page.content)}" class="empty-state">
+        <div style="font-size: 2.5rem; margin-bottom: 8px;">📭</div>
+        <div>Tidak ada produk ditemukan.</div>
+        <div class="small">Coba ubah kata kunci pencarian atau filter lokasi.</div>
+      </div>
 
-      <!-- TABLE -->
-      <div class="table-responsive">
+      <div th:if="${page != null and !#lists.isEmpty(page.content)}" class="table-responsive">
         <table class="table table-hover mb-0">
           <thead>
           <tr>
-            <th class="ps-4">Template</th>
-            <th>Brand / Owner</th>
-            <th>Kategori</th>
-            <th class="text-center">Jumlah Varian</th>
-            <th class="text-end pe-4">Aksi</th>
+            <th style="width: 50px;">#</th>
+            <th style="width: 80px;">Gambar</th>
+            <th>Nama Produk / Varian</th>
+            <th>SKU</th>
+            <th class="text-center">Variant ID</th>
+
+            <th class="text-center has-tooltip"
+                title="Jumlah lokasi aktif / total lokasi">
+              Lokasi Aktif INJ
+            </th>
+
+            <th class="text-center has-tooltip"
+                title="Status konfigurasi INJ">
+              Status INJ
+            </th>
+
+            <th>Last Sync</th>
+            <th class="text-center" style="width: 120px;">Aksi</th>
           </tr>
           </thead>
-          <tbody>
 
-          <!-- row = ProductOdooInjSpecResponse -->
-          <tr th:each="row : ${page.content}">
-            <!-- Template Name -->
-            <td class="ps-4">
-              <div class="fw-semibold" th:text="${row.templateName}">Nama Template</div>
-              <div class="small text-muted">
-                ID: <span th:text="${row.templateId}">0</span>
-              </div>
-            </td>
-
-            <!-- Brand + Owner -->
-            <td>
-              <div class="sku-text mb-1" th:text="${row.brand}">Brand</div>
-              <div class="small text-muted" th:text="${row.ownerId}">Owner</div>
-            </td>
-
-            <!-- Category -->
-            <td>
-              <span class="small text-muted" th:text="${row.category}">Kategori</span>
-            </td>
-
-            <!-- Jumlah Varian -->
-            <td class="text-center">
-              <span class="badge bg-light text-dark">
-                <span th:text="${#lists.size(row.variants)}">0</span> varian
-              </span>
-            </td>
-
-            <!-- Aksi -->
-            <td class="text-end pe-4">
-              <a th:href="@{/catalogue-ui/inj-spec(odooProductId=${row.templateId})}"
-                 class="btn btn-outline-primary btn-sm btn-config">
-                Atur INJ
-              </a>
-            </td>
+          <!-- HIDDEN DATA SOURCE: Thymeleaf render semua varian sebagai baris tersembunyi dulu,
+               lalu JS yang group by templateName -->
+          <tbody id="rawData" class="d-none">
+          <tr th:each="p,iter : ${page.content}"
+              class="js-raw"
+              th:data-template-name="${p.templateName}"
+              th:data-template-id="${p.templateId != null ? p.templateId : (!#lists.isEmpty(p.variants) ? p.variants[0].variantId : '')}"
+              th:data-variant-id="${!#lists.isEmpty(p.variants) ? p.variants[0].variantId : ''}"
+              th:data-variant-name="${!#lists.isEmpty(p.variants) ? p.variants[0].name : ''}"
+              th:data-sku="${!#lists.isEmpty(p.variants) ? p.variants[0].sku : ''}"
+              th:data-image="${!#lists.isEmpty(p.variants) ? p.variants[0].imageBase64 : ''}"
+              th:data-category="${p.category}"
+              th:data-location-count="${p.locationCount != null ? p.locationCount : 0}"
+              th:data-active-count="${p.activeLocationCount != null ? p.activeLocationCount : 0}"
+              th:data-last-sync="${p.lastSyncedAt != null ? #temporals.format(p.lastSyncedAt, 'dd MMM yyyy HH:mm') : ''}">
           </tr>
-
-          <tr th:if="${#lists.isEmpty(page.content)}">
-            <td colspan="5" class="empty-state">
-              Tidak ada produk yang cocok dengan filter ini.
-            </td>
-          </tr>
-
           </tbody>
+
+          <!-- RENDERED TABLE (di-build oleh JS) -->
+          <tbody id="groupedTable"></tbody>
         </table>
       </div>
+    </div>
 
-      <!-- PAGINATION -->
-      <div class="d-flex justify-content-between align-items-center px-4 py-3 border-top">
-        <div class="small text-muted">
-          Menampilkan
-          <span th:text="${page.number * page.size + 1}"
-                th:if="${page.totalElements > 0}">1</span>
-          <span th:if="${page.totalElements == 0}">0</span>
-          -
-          <span th:text="${page.number * page.size + page.numberOfElements}">20</span>
-          dari
-          <span th:text="${page.totalElements}">0</span>
-          produk
-        </div>
-
-        <nav th:if="${page.totalPages > 1}">
-          <ul class="pagination mb-0">
-
-            <!-- Prev -->
-            <li class="page-item" th:classappend="${page.first} ? 'disabled'">
-              <a class="page-link"
-                 th:href="@{/catalogue-ui/inj-spec-list(
-                                   q=${q},
-                                   category=${category},
-                                   size=${size},
-                                   page=${page.number - 1}
-                               )}">&laquo;</a>
-            </li>
-
-            <!-- Numbered pages -->
-            <li class="page-item"
-                th:each="p : ${#numbers.sequence(0, page.totalPages - 1)}"
-                th:classappend="${p == page.number} ? 'active'">
-              <a class="page-link"
-                 th:text="${p + 1}"
-                 th:href="@{/catalogue-ui/inj-spec-list(
-                                   q=${q},
-                                   category=${category},
-                                   size=${size},
-                                   page=${p}
-                               )}">
-                1
-              </a>
-            </li>
-
-            <!-- Next -->
-            <li class="page-item" th:classappend="${page.last} ? 'disabled'">
-              <a class="page-link"
-                 th:href="@{/catalogue-ui/inj-spec-list(
-                                   q=${q},
-                                   category=${category},
-                                   size=${size},
-                                   page=${page.number + 1}
-                               )}">&raquo;</a>
-            </li>
-
-          </ul>
-        </nav>
+    <!-- PAGINATION -->
+    <div th:if="${page != null and page.totalElements > 0}"
+         class="card-footer d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div class="pagination-info">
+        Menampilkan
+        <strong th:text="${page.number * page.size + 1}">1</strong>
+        -
+        <strong th:text="${page.number * page.size + #lists.size(page.content)}">20</strong>
+        dari
+        <strong th:text="${page.totalElements}">0</strong>
+        varian
+        (Halaman <strong th:text="${page.number + 1}">1</strong>
+        / <strong th:text="${page.totalPages}">1</strong>)
+        &nbsp;•&nbsp;
+        <span class="text-muted">
+                    Grouping: <strong id="groupCount">0</strong> template
+                </span>
       </div>
 
+      <nav th:if="${page.totalPages > 1}">
+        <ul class="pagination pagination-sm mb-0">
+          <li class="page-item" th:classappend="${page.first} ? 'disabled'">
+            <a class="page-link"
+               th:href="@{/catalogue-ui/inj-spec-list(q=${q}, locationId=${locationId}, size=${size}, page=${page.number - 1})}">
+              ← Prev
+            </a>
+          </li>
+
+          <li th:each="i : ${#numbers.sequence(
+                            T(java.lang.Math).max(0, page.number - 3),
+                            T(java.lang.Math).min(page.totalPages - 1, page.number + 3)
+                          )}"
+              class="page-item"
+              th:classappend="${i == page.number} ? 'active'">
+            <a class="page-link"
+               th:href="@{/catalogue-ui/inj-spec-list(q=${q}, locationId=${locationId}, size=${size}, page=${i})}"
+               th:text="${i + 1}">1</a>
+          </li>
+
+          <li class="page-item" th:classappend="${page.last} ? 'disabled'">
+            <a class="page-link"
+               th:href="@{/catalogue-ui/inj-spec-list(q=${q}, locationId=${locationId}, size=${size}, page=${page.number + 1})}">
+              Next →
+            </a>
+          </li>
+        </ul>
+      </nav>
     </div>
   </div>
 
 </div>
 
-<!-- AUTO REFRESH (opsional, bisa dimatikan kalau mengganggu) -->
-<script>
-  const REFRESH_INTERVAL_MS = 60000;
-  setInterval(function () {
-    window.location.reload();
-  }, REFRESH_INTERVAL_MS);
+<script th:inline="javascript">
+  const SPEC_URL_BASE = /*[[@{/catalogue-ui/inj-spec}]]*/ "/catalogue-ui/inj-spec";
+
+  // ====== HELPERS ======
+  function statusBadge(total, active) {
+      if (total === 0) {
+          return `<span class="status-badge status-belum">Tidak Ada Stok</span>`;
+      }
+      if (active === 0) {
+          return `<span class="status-badge status-belum">Belum Disetup</span>`;
+      }
+      if (active < total) {
+          return `<span class="status-badge status-sebagian">Sebagian Aktif</span>`;
+      }
+      return `<span class="status-badge status-aktif">Aktif Semua</span>`;
+  }
+
+  function ratioCell(total, active) {
+      let cls = "ratio-none";
+      if (active > 0 && active === total) cls = "ratio-active";
+      else if (active > 0) cls = "ratio-partial";
+      return `<span class="ratio-cell ${cls}">
+                  <span>${active}</span>
+                  <span class="ratio-sep">/</span>
+                  <span class="ratio-total">${total}</span>
+              </span>`;
+  }
+
+  function imgCell(base64) {
+      if (base64 && base64.length > 0) {
+          return `<img src="data:image/jpeg;base64,${base64}"
+                       alt="product" class="product-thumb border"/>`;
+      }
+      return `<div class="product-thumb-placeholder">No Img</div>`;
+  }
+
+  function openSpecUrl(variantId) {
+      return `${SPEC_URL_BASE}?odooProductId=${variantId}`;
+  }
+
+  // Extract bagian dalam kurung dari nama varian.
+  // Contoh: "DUMMY CELANA TENUN (M, MOTIF KOTAK)" → "M, MOTIF KOTAK"
+  //         "DUMMY KAOS TENUN" → "" (tidak ada kurung)
+  function extractAttributes(variantName, templateName) {
+      if (!variantName) return "";
+
+      // Coba ambil isi kurung terakhir
+      const match = variantName.match(/\(([^()]+)\)\s*$/);
+      if (match) return match[1].trim();
+
+      // Kalau tidak ada kurung tapi beda dari templateName, tampilkan nama varian full
+      if (templateName && variantName !== templateName) {
+          // Buang prefix templateName kalau ada
+          const prefix = templateName.trim();
+          if (variantName.startsWith(prefix)) {
+              const rest = variantName.substring(prefix.length).trim();
+              if (rest) return rest;
+          }
+          return variantName;
+      }
+
+      return "";
+  }
+
+  // ====== READ RAW DATA DARI THYMELEAF ======
+  function readRawData() {
+      const raws = document.querySelectorAll("#rawData tr.js-raw");
+      return Array.from(raws).map(r => ({
+          templateName: r.getAttribute("data-template-name") || "Tanpa Nama",
+          templateId:   r.getAttribute("data-template-id"),
+          variantId:    r.getAttribute("data-variant-id"),
+          variantName:  r.getAttribute("data-variant-name") || "",
+          sku:          r.getAttribute("data-sku"),
+          image:        r.getAttribute("data-image"),
+          category:     r.getAttribute("data-category"),
+          locationCount:  parseInt(r.getAttribute("data-location-count") || "0"),
+          activeCount:    parseInt(r.getAttribute("data-active-count") || "0"),
+          lastSync:       r.getAttribute("data-last-sync") || ""
+      }));
+  }
+
+  // ====== GROUP BY TEMPLATE NAME ======
+  function groupByTemplate(rows) {
+      const map = new Map();
+      for (const row of rows) {
+          const key = row.templateName;
+          if (!map.has(key)) map.set(key, []);
+          map.get(key).push(row);
+      }
+      return map;
+  }
+
+  // ====== RENDER TABLE ======
+  function renderTable() {
+      const tbody = document.getElementById("groupedTable");
+      const rows = readRawData();
+      const groups = groupByTemplate(rows);
+
+      tbody.innerHTML = "";
+      let parentIdx = 0;
+
+      groups.forEach((variants, templateName) => {
+          parentIdx++;
+
+          // Agregasi untuk parent: total lokasi, total aktif (sum across variants)
+          let sumLocations = 0;
+          let sumActive = 0;
+          variants.forEach(v => {
+              sumLocations += v.locationCount;
+              sumActive += v.activeCount;
+          });
+
+          // Image parent = image varian pertama yang punya image
+          const firstImageVar = variants.find(v => v.image && v.image.length > 0);
+          const parentImage = firstImageVar ? firstImageVar.image : null;
+
+          // Category: pakai dari varian pertama
+          const category = variants[0].category || "";
+
+          // Tombol "Buka Spec" di parent → arahkan ke varian pertama
+          const firstVariantId = variants[0].variantId;
+
+          const parentId = `tpl-${parentIdx}`;
+
+          // ---- Parent row ----
+          const parentTr = document.createElement("tr");
+          parentTr.className = "template-row js-template-row";
+          parentTr.dataset.group = parentId;
+          parentTr.innerHTML = `
+              <td class="text-muted">
+                  <span class="template-chev">▼</span>${parentIdx}
+              </td>
+              <td>${imgCell(parentImage)}</td>
+              <td>
+                  <div>${templateName}
+                      <span class="template-variant-count">${variants.length} varian</span>
+                  </div>
+                  ${category ? `<div class="text-muted small fw-normal">${category}</div>` : ""}
+              </td>
+              <td class="small text-muted">—</td>
+              <td class="text-center small text-muted">—</td>
+              <td class="text-center">${ratioCell(sumLocations, sumActive)}</td>
+              <td class="text-center">${statusBadge(sumLocations, sumActive)}</td>
+              <td class="small text-muted">—</td>
+              <td class="text-center">
+                  <a href="${openSpecUrl(firstVariantId)}" class="btn btn-primary btn-open-spec"
+                     onclick="event.stopPropagation()">
+                      Buka Spec →
+                  </a>
+              </td>
+          `;
+          tbody.appendChild(parentTr);
+
+          // ---- Child rows (satu per variant) ----
+          variants.forEach((v, i) => {
+              const childTr = document.createElement("tr");
+              childTr.className = "variant-row js-variant-row";
+              childTr.dataset.group = parentId;
+
+              // Label varian = atribut (dalam kurung) atau nama full kalau tidak ada
+              const attrLabel = extractAttributes(v.variantName, templateName);
+              const displayName = attrLabel
+                  ? `↳ <span class="variant-attr">${attrLabel}</span>`
+                  : `↳ <span class="text-muted">Varian ${i + 1}</span>`;
+
+              childTr.innerHTML = `
+                  <td class="text-muted small">${parentIdx}.${i + 1}</td>
+                  <td>${imgCell(v.image)}</td>
+                  <td class="small">${displayName}</td>
+                  <td class="small">${v.sku || "-"}</td>
+                  <td class="text-center small">${v.variantId || "-"}</td>
+                  <td class="text-center">${ratioCell(v.locationCount, v.activeCount)}</td>
+                  <td class="text-center">${statusBadge(v.locationCount, v.activeCount)}</td>
+                  <td class="small text-muted">${v.lastSync || '<span class="text-muted">Belum sync</span>'}</td>
+                  <td class="text-center">
+                      <a href="${openSpecUrl(v.variantId)}" class="btn btn-primary btn-open-spec">
+                          Buka Spec →
+                      </a>
+                  </td>
+              `;
+              tbody.appendChild(childTr);
+          });
+      });
+
+      // update group count di footer
+      const gc = document.getElementById("groupCount");
+      if (gc) gc.textContent = groups.size;
+
+      // default: semua template collapsed
+      collapseAll();
+      attachToggleListeners();
+  }
+
+  // ====== EXPAND / COLLAPSE ======
+  function attachToggleListeners() {
+      document.querySelectorAll(".js-template-row").forEach(row => {
+          row.addEventListener("click", (e) => {
+              // jangan toggle kalau klik tombol
+              if (e.target.tagName === "A" || e.target.closest("a")) return;
+              toggleGroup(row.dataset.group);
+          });
+      });
+  }
+
+  function toggleGroup(groupId) {
+      const parent = document.querySelector(`.js-template-row[data-group="${groupId}"]`);
+      const children = document.querySelectorAll(`.js-variant-row[data-group="${groupId}"]`);
+      const willCollapse = !parent.classList.contains("collapsed");
+
+      parent.classList.toggle("collapsed", willCollapse);
+      children.forEach(c => c.classList.toggle("d-none", willCollapse));
+  }
+
+  function collapseAll() {
+      document.querySelectorAll(".js-template-row").forEach(p => p.classList.add("collapsed"));
+      document.querySelectorAll(".js-variant-row").forEach(c => c.classList.add("d-none"));
+  }
+
+  function expandAll() {
+      document.querySelectorAll(".js-template-row").forEach(p => p.classList.remove("collapsed"));
+      document.querySelectorAll(".js-variant-row").forEach(c => c.classList.remove("d-none"));
+  }
+
+  // ====== INIT ======
+  document.addEventListener("DOMContentLoaded", () => {
+      renderTable();
+
+      const btnExpand = document.getElementById("btnExpandAll");
+      const btnCollapse = document.getElementById("btnCollapseAll");
+      if (btnExpand) btnExpand.addEventListener("click", expandAll);
+      if (btnCollapse) btnCollapse.addEventListener("click", collapseAll);
+
+      // aktifkan tooltip bootstrap
+      if (window.bootstrap) {
+          document.querySelectorAll(".has-tooltip").forEach(el => {
+              new bootstrap.Tooltip(el, { placement: "top" });
+          });
+      }
+  });
 </script>
 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

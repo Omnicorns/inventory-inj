@@ -103,13 +103,13 @@ public class PostSaveOdooCatalogueProductService {
     // Scheduler Safety Tuning
     // =============================
     private static final Duration MIN_GAP_BETWEEN_RUNS = Duration.ofSeconds(30); // "realtime" tapi aman
-    private static final Duration MAX_RUN_DURATION     = Duration.ofSeconds(20); // time budget per run
-    private static final int      MAX_CHANGED_SAVES    = 200;                    // batasi write per run
-    private static final Duration ERROR_COOLDOWN       = Duration.ofSeconds(60); // kalau error, jangan spam
+    private static final Duration MAX_RUN_DURATION = Duration.ofSeconds(20); // time budget per run
+    private static final int MAX_CHANGED_SAVES = 200;                    // batasi write per run
+    private static final Duration ERROR_COOLDOWN = Duration.ofSeconds(60); // kalau error, jangan spam
 
     private final AtomicBoolean running = new AtomicBoolean(false);
-    private volatile Instant lastStart  = Instant.EPOCH;
-    private volatile Instant lastError  = Instant.EPOCH;
+    private volatile Instant lastStart = Instant.EPOCH;
+    private volatile Instant lastError = Instant.EPOCH;
 
     /**
      * Scheduler yang aman:
@@ -117,7 +117,7 @@ public class PostSaveOdooCatalogueProductService {
      * - tetap ada rate-limit MIN_GAP
      * - skip kalau masih running
      * - cooldown kalau error
-     *
+     * <p>
      * Bisa override delay via env/property: sync.catalogue.delay-ms
      */
     @Scheduled(fixedDelayString = "${sync.catalogue.delay-ms:15000}", zone = "Asia/Jakarta")
@@ -161,7 +161,7 @@ public class PostSaveOdooCatalogueProductService {
      * - ada time budget
      * - batasi max write (changed saves)
      * - upsert per variant pakai TX bean (CatalogueUpsertTxService)
-     *
+     * <p>
      * NOTE: method ini sengaja TANPA @Transactional
      */
     public SyncRunResult executeSafely(int maxChangedSaves, Duration maxRunDuration) {
@@ -548,8 +548,8 @@ public class PostSaveOdooCatalogueProductService {
         }
     }
 
-    // =====================================================================================
-    // Repository Interface (EntityGraph untuk preload relasi agar tidak LazyInitializationException)
-    // =====================================================================================
+// =====================================================================================
+// Repository Interface (EntityGraph untuk preload relasi agar tidak LazyInitializationException)
+// =====================================================================================
 
 }
