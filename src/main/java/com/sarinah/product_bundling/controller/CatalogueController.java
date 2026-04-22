@@ -7,6 +7,7 @@ import com.sarinah.product_bundling.model.response.ProductInjSpecResponse;
 import com.sarinah.product_bundling.model.response.ProductOdooInjSpecResponse;
 import com.sarinah.product_bundling.service.InventoryInjService;
 import com.sarinah.product_bundling.service.PostCatalogueList;
+import com.sarinah.product_bundling.service.PostSaveOdooCatalogueProductService;
 import com.sarinah.product_bundling.service.ProductInjSpecService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +23,7 @@ public class CatalogueController {
     private final PostCatalogueList postCatalogueList;
     private final ProductInjSpecService productInjSpecService;
     private final InventoryInjService inventoryInjService;
+
 
     @PostMapping(value = "/list")
     public ArrayNode postScanResponse() {
@@ -55,6 +57,9 @@ public class CatalogueController {
 //           // return ResponseEntity.ok(resp);
 //        } else {
             // list semua / difilter sku
+
+
+
             List<ProductOdooInjSpecResponse> list = productInjSpecService.getAllSpec(category)
                     .stream()
                     .map(resp -> {
