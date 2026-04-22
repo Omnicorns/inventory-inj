@@ -29,8 +29,7 @@ public interface CatalogueOdooProductRepository extends JpaRepository<CatalogOdo
     @EntityGraph(attributePaths = {"attributes"}) // ONLY ONE BAG
     Optional<CatalogOdooProduct> findGraphByOdooProductId(Long odooProductId);
 
-    @EntityGraph(attributePaths = {"attributes"}) // ONLY ONE BAG
-    Optional<CatalogOdooProduct> findGraphByOdooProductId(Long odooProductId);
+
 
 
 }
