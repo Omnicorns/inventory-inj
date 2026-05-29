@@ -294,24 +294,113 @@
 
           <!-- HIDDEN DATA SOURCE: Thymeleaf render semua varian sebagai baris tersembunyi dulu,
                lalu JS yang group by templateName -->
-          <tbody id="rawData" class="d-none">
-          <tr th:each="p,iter : ${page.content}"
-              class="js-raw"
-              th:data-template-name="${p.templateName}"
-              th:data-template-id="${p.templateId != null ? p.templateId : (!#lists.isEmpty(p.variants) ? p.variants[0].variantId : '')}"
-              th:data-variant-id="${!#lists.isEmpty(p.variants) ? p.variants[0].variantId : ''}"
-              th:data-variant-name="${!#lists.isEmpty(p.variants) ? p.variants[0].name : ''}"
-              th:data-sku="${!#lists.isEmpty(p.variants) ? p.variants[0].sku : ''}"
-              th:data-image="${!#lists.isEmpty(p.variants) ? p.variants[0].imageBase64 : ''}"
-              th:data-category="${p.category}"
-              th:data-location-count="${p.locationCount != null ? p.locationCount : 0}"
-              th:data-active-count="${p.activeLocationCount != null ? p.activeLocationCount : 0}"
-              th:data-last-sync="${p.lastSyncedAt != null ? #temporals.format(p.lastSyncedAt, 'dd MMM yyyy HH:mm') : ''}">
-          </tr>
+          <tbody>
+          <th:block th:each="tpl,tIter : ${page.content}"
+                    th:with="tplLoc=${tpl.locationCount != null ? tpl.locationCount : 0},
+                   tplAct=${tpl.activeLocationCount != null ? tpl.activeLocationCount : 0},
+                   gid=${'tpl-' + tIter.index}">
+
+            <!-- ===== PARENT ROW (template) ===== -->
+            <tr class="template-row js-template-row collapsed" th:data-group="${gid}">
+              <td class="text-muted">
+                <span class="template-chev">▼</span>
+                <span th:text="${tIter.index + 1}">1</span>
+              </td>
+              <td th:with="tplImg=${!#lists.isEmpty(tpl.variants) ? tpl.variants[0].imageBase64 : null}">
+                <img th:if="${tplImg != null}"
+                     th:src="'data:image/jpeg;base64,' + ${tplImg}"
+                     class="product-thumb border" alt="product"/>
+                <div th:if="${tplImg == null}" class="product-thumb-placeholder">No Img</div>
+              </td>
+              <td>
+                <div>
+                  <span th:text="${tpl.templateName}">Nama</span>
+                  <span class="template-variant-count"
+                        th:text="${#lists.size(tpl.variants)} + ' varian'">0 varian</span>
+                </div>
+                <div th:if="${tpl.category != null}" class="text-muted small fw-normal"
+                     th:text="${tpl.category}">Kategori</div>
+              </td>
+              <td class="small text-muted">—</td>
+              <td class="text-center small text-muted">—</td>
+
+              <!-- ratio agregat -->
+
+              <td class="text-center" th:with="cls=${tplLoc > 0 and tplAct == tplLoc ? 'ratio-active' : (tplAct > 0 ? 'ratio-partial' : 'ratio-none')}">
+    <span class="ratio-cell" th:classappend="${cls}">
+        <span th:text="${tplAct}">0</span>
+        <span class="ratio-sep">/</span>
+        <span class="ratio-total" th:text="${tplLoc}">0</span>
+    </span>
+              </td>
+
+              <!-- status agregat -->
+              <td class="text-center" th:with="
+        badgeCls=${tplLoc == 0 ? 'status-belum' : (tplAct == 0 ? 'status-belum' : (tplAct lt tplLoc ? 'status-sebagian' : 'status-aktif'))},
+        badgeTxt=${tplLoc == 0 ? 'Tidak Ada Stok' : (tplAct == 0 ? 'Belum Disetup' : (tplAct lt tplLoc ? 'Sebagian Aktif' : 'Aktif Semua'))}">
+                <span class="status-badge" th:classappend="${badgeCls}" th:text="${badgeTxt}">Status</span>
+              </td>
+
+              <td class="small text-muted">—</td>
+              <td class="text-center">
+                <a th:href="@{/catalogue-ui/inj-spec(odooProductId=${tpl.variants[0].variantId})}"
+                   class="btn btn-primary btn-open-spec" onclick="event.stopPropagation()">
+                  Buka Spec →
+                </a>
+              </td>
+            </tr>
+
+            <!-- ===== CHILD ROWS (varian) ===== -->
+            <tr th:each="v,vIter : ${tpl.variants}"
+                class="variant-row js-variant-row d-none"
+                th:data-group="${gid}"
+                th:with="vLoc=${v.locationCount != null ? v.locationCount : 0},
+                 vAct=${v.activeLocationCount != null ? v.activeLocationCount : 0}">
+              <td class="text-muted small" th:text="${(tIter.index + 1) + '.' + (vIter.index + 1)}">1.1</td>
+              <td>
+                <img th:if="${v.imageBase64 != null}"
+                     th:src="'data:image/jpeg;base64,' + ${v.imageBase64}"
+                     class="product-thumb border" alt="variant"/>
+                <div th:if="${v.imageBase64 == null}" class="product-thumb-placeholder">No Img</div>
+              </td>
+              <td class="small">
+                ↳
+                <span th:if="${v.attributes != null and !#lists.isEmpty(v.attributes)}">
+                <span th:each="a : ${v.attributes}" class="variant-attr"
+                      th:text="${a.value}">Hitam</span>
+            </span>
+                <span th:if="${v.attributes == null or #lists.isEmpty(v.attributes)}"
+                      class="text-muted" th:text="${v.name}">Varian</span>
+              </td>
+              <td class="small" th:text="${v.sku != null ? v.sku : '-'}">SKU</td>
+              <td class="text-center small" th:text="${v.variantId}">0</td>
+
+              <td class="text-center" th:with="cls=${vLoc > 0 and vAct == vLoc ? 'ratio-active' : (vAct > 0 ? 'ratio-partial' : 'ratio-none')}">
+            <span class="ratio-cell" th:classappend="${cls}">
+                <span th:text="${vAct}">0</span>
+                <span class="ratio-sep">/</span>
+                <span class="ratio-total" th:text="${vLoc}">0</span>
+            </span>
+              </td>
+
+              <td class="text-center" th:with="
+        badgeCls=${vLoc == 0 ? 'status-belum' : (vAct == 0 ? 'status-belum' : (vAct lt vLoc ? 'status-sebagian' : 'status-aktif'))},
+        badgeTxt=${vLoc == 0 ? 'Tidak Ada Stok' : (vAct == 0 ? 'Belum Disetup' : (vAct lt vLoc ? 'Sebagian Aktif' : 'Aktif Semua'))}">
+                <span class="status-badge" th:classappend="${badgeCls}" th:text="${badgeTxt}">Status</span>
+              </td>
+
+              <td class="small text-muted"
+                  th:text="${v.lastSyncedAt != null ? #temporals.format(v.lastSyncedAt, 'dd MMM yyyy HH:mm') : 'Belum sync'}">—</td>
+              <td class="text-center">
+                <a th:href="@{/catalogue-ui/inj-spec(odooProductId=${v.variantId})}"
+                   class="btn btn-primary btn-open-spec">Buka Spec →</a>
+              </td>
+            </tr>
+          </th:block>
           </tbody>
 
           <!-- RENDERED TABLE (di-build oleh JS) -->
-          <tbody id="groupedTable"></tbody>
+<!--          <tbody id="groupedTable"></tbody>-->
         </table>
       </div>
     </div>
@@ -321,18 +410,10 @@
          class="card-footer d-flex justify-content-between align-items-center flex-wrap gap-2">
       <div class="pagination-info">
         Menampilkan
-        <strong th:text="${page.number * page.size + 1}">1</strong>
-        -
+        <strong th:text="${page.number * page.size + 1}">1</strong> -
         <strong th:text="${page.number * page.size + #lists.size(page.content)}">20</strong>
-        dari
-        <strong th:text="${page.totalElements}">0</strong>
-        varian
-        (Halaman <strong th:text="${page.number + 1}">1</strong>
-        / <strong th:text="${page.totalPages}">1</strong>)
-        &nbsp;•&nbsp;
-        <span class="text-muted">
-                    Grouping: <strong id="groupCount">0</strong> template
-                </span>
+        dari <strong th:text="${page.totalElements}">0</strong> template
+        (Halaman <strong th:text="${page.number + 1}">1</strong> / <strong th:text="${page.totalPages}">1</strong>)
       </div>
 
       <nav th:if="${page.totalPages > 1}">
@@ -369,245 +450,36 @@
 </div>
 
 <script th:inline="javascript">
-  const SPEC_URL_BASE = /*[[@{/catalogue-ui/inj-spec}]]*/ "/catalogue-ui/inj-spec";
+  <script>
+function toggleGroup(gid) {
+    const parent = document.querySelector(`.js-template-row[data-group="${gid}"]`);
+    const children = document.querySelectorAll(`.js-variant-row[data-group="${gid}"]`);
+    const willCollapse = !parent.classList.contains("collapsed");
+    parent.classList.toggle("collapsed", willCollapse);
+    children.forEach(c => c.classList.toggle("d-none", willCollapse));
+}
 
-  // ====== HELPERS ======
-  function statusBadge(total, active) {
-      if (total === 0) {
-          return `<span class="status-badge status-belum">Tidak Ada Stok</span>`;
-      }
-      if (active === 0) {
-          return `<span class="status-badge status-belum">Belum Disetup</span>`;
-      }
-      if (active < total) {
-          return `<span class="status-badge status-sebagian">Sebagian Aktif</span>`;
-      }
-      return `<span class="status-badge status-aktif">Aktif Semua</span>`;
-  }
+document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll(".js-template-row").forEach(row => {
+        row.addEventListener("click", e => {
+            if (e.target.closest("a")) return;
+            toggleGroup(row.dataset.group);
+        });
+    });
 
-  function ratioCell(total, active) {
-      let cls = "ratio-none";
-      if (active > 0 && active === total) cls = "ratio-active";
-      else if (active > 0) cls = "ratio-partial";
-      return `<span class="ratio-cell ${cls}">
-                  <span>${active}</span>
-                  <span class="ratio-sep">/</span>
-                  <span class="ratio-total">${total}</span>
-              </span>`;
-  }
+    const setAll = show => {
+        document.querySelectorAll(".js-template-row").forEach(p => p.classList.toggle("collapsed", !show));
+        document.querySelectorAll(".js-variant-row").forEach(c => c.classList.toggle("d-none", !show));
+    };
+    document.getElementById("btnExpandAll")?.addEventListener("click", () => setAll(true));
+    document.getElementById("btnCollapseAll")?.addEventListener("click", () => setAll(false));
 
-  function imgCell(base64) {
-      if (base64 && base64.length > 0) {
-          return `<img src="data:image/jpeg;base64,${base64}"
-                       alt="product" class="product-thumb border"/>`;
-      }
-      return `<div class="product-thumb-placeholder">No Img</div>`;
-  }
-
-  function openSpecUrl(variantId) {
-      return `${SPEC_URL_BASE}?odooProductId=${variantId}`;
-  }
-
-  // Extract bagian dalam kurung dari nama varian.
-  // Contoh: "DUMMY CELANA TENUN (M, MOTIF KOTAK)" → "M, MOTIF KOTAK"
-  //         "DUMMY KAOS TENUN" → "" (tidak ada kurung)
-  function extractAttributes(variantName, templateName) {
-      if (!variantName) return "";
-
-      // Coba ambil isi kurung terakhir
-      const match = variantName.match(/\(([^()]+)\)\s*$/);
-      if (match) return match[1].trim();
-
-      // Kalau tidak ada kurung tapi beda dari templateName, tampilkan nama varian full
-      if (templateName && variantName !== templateName) {
-          // Buang prefix templateName kalau ada
-          const prefix = templateName.trim();
-          if (variantName.startsWith(prefix)) {
-              const rest = variantName.substring(prefix.length).trim();
-              if (rest) return rest;
-          }
-          return variantName;
-      }
-
-      return "";
-  }
-
-  // ====== READ RAW DATA DARI THYMELEAF ======
-  function readRawData() {
-      const raws = document.querySelectorAll("#rawData tr.js-raw");
-      return Array.from(raws).map(r => ({
-          templateName: r.getAttribute("data-template-name") || "Tanpa Nama",
-          templateId:   r.getAttribute("data-template-id"),
-          variantId:    r.getAttribute("data-variant-id"),
-          variantName:  r.getAttribute("data-variant-name") || "",
-          sku:          r.getAttribute("data-sku"),
-          image:        r.getAttribute("data-image"),
-          category:     r.getAttribute("data-category"),
-          locationCount:  parseInt(r.getAttribute("data-location-count") || "0"),
-          activeCount:    parseInt(r.getAttribute("data-active-count") || "0"),
-          lastSync:       r.getAttribute("data-last-sync") || ""
-      }));
-  }
-
-  // ====== GROUP BY TEMPLATE NAME ======
-  function groupByTemplate(rows) {
-      const map = new Map();
-      for (const row of rows) {
-          const key = row.templateName;
-          if (!map.has(key)) map.set(key, []);
-          map.get(key).push(row);
-      }
-      return map;
-  }
-
-  // ====== RENDER TABLE ======
-  function renderTable() {
-      const tbody = document.getElementById("groupedTable");
-      const rows = readRawData();
-      const groups = groupByTemplate(rows);
-
-      tbody.innerHTML = "";
-      let parentIdx = 0;
-
-      groups.forEach((variants, templateName) => {
-          parentIdx++;
-
-          // Agregasi untuk parent: total lokasi, total aktif (sum across variants)
-          let sumLocations = 0;
-          let sumActive = 0;
-          variants.forEach(v => {
-              sumLocations += v.locationCount;
-              sumActive += v.activeCount;
-          });
-
-          // Image parent = image varian pertama yang punya image
-          const firstImageVar = variants.find(v => v.image && v.image.length > 0);
-          const parentImage = firstImageVar ? firstImageVar.image : null;
-
-          // Category: pakai dari varian pertama
-          const category = variants[0].category || "";
-
-          // Tombol "Buka Spec" di parent → arahkan ke varian pertama
-          const firstVariantId = variants[0].variantId;
-
-          const parentId = `tpl-${parentIdx}`;
-
-          // ---- Parent row ----
-          const parentTr = document.createElement("tr");
-          parentTr.className = "template-row js-template-row";
-          parentTr.dataset.group = parentId;
-          parentTr.innerHTML = `
-              <td class="text-muted">
-                  <span class="template-chev">▼</span>${parentIdx}
-              </td>
-              <td>${imgCell(parentImage)}</td>
-              <td>
-                  <div>${templateName}
-                      <span class="template-variant-count">${variants.length} varian</span>
-                  </div>
-                  ${category ? `<div class="text-muted small fw-normal">${category}</div>` : ""}
-              </td>
-              <td class="small text-muted">—</td>
-              <td class="text-center small text-muted">—</td>
-              <td class="text-center">${ratioCell(sumLocations, sumActive)}</td>
-              <td class="text-center">${statusBadge(sumLocations, sumActive)}</td>
-              <td class="small text-muted">—</td>
-              <td class="text-center">
-                  <a href="${openSpecUrl(firstVariantId)}" class="btn btn-primary btn-open-spec"
-                     onclick="event.stopPropagation()">
-                      Buka Spec →
-                  </a>
-              </td>
-          `;
-          tbody.appendChild(parentTr);
-
-          // ---- Child rows (satu per variant) ----
-          variants.forEach((v, i) => {
-              const childTr = document.createElement("tr");
-              childTr.className = "variant-row js-variant-row";
-              childTr.dataset.group = parentId;
-
-              // Label varian = atribut (dalam kurung) atau nama full kalau tidak ada
-              const attrLabel = extractAttributes(v.variantName, templateName);
-              const displayName = attrLabel
-                  ? `↳ <span class="variant-attr">${attrLabel}</span>`
-                  : `↳ <span class="text-muted">Varian ${i + 1}</span>`;
-
-              childTr.innerHTML = `
-                  <td class="text-muted small">${parentIdx}.${i + 1}</td>
-                  <td>${imgCell(v.image)}</td>
-                  <td class="small">${displayName}</td>
-                  <td class="small">${v.sku || "-"}</td>
-                  <td class="text-center small">${v.variantId || "-"}</td>
-                  <td class="text-center">${ratioCell(v.locationCount, v.activeCount)}</td>
-                  <td class="text-center">${statusBadge(v.locationCount, v.activeCount)}</td>
-                  <td class="small text-muted">${v.lastSync || '<span class="text-muted">Belum sync</span>'}</td>
-                  <td class="text-center">
-                      <a href="${openSpecUrl(v.variantId)}" class="btn btn-primary btn-open-spec">
-                          Buka Spec →
-                      </a>
-                  </td>
-              `;
-              tbody.appendChild(childTr);
-          });
-      });
-
-      // update group count di footer
-      const gc = document.getElementById("groupCount");
-      if (gc) gc.textContent = groups.size;
-
-      // default: semua template collapsed
-      collapseAll();
-      attachToggleListeners();
-  }
-
-  // ====== EXPAND / COLLAPSE ======
-  function attachToggleListeners() {
-      document.querySelectorAll(".js-template-row").forEach(row => {
-          row.addEventListener("click", (e) => {
-              // jangan toggle kalau klik tombol
-              if (e.target.tagName === "A" || e.target.closest("a")) return;
-              toggleGroup(row.dataset.group);
-          });
-      });
-  }
-
-  function toggleGroup(groupId) {
-      const parent = document.querySelector(`.js-template-row[data-group="${groupId}"]`);
-      const children = document.querySelectorAll(`.js-variant-row[data-group="${groupId}"]`);
-      const willCollapse = !parent.classList.contains("collapsed");
-
-      parent.classList.toggle("collapsed", willCollapse);
-      children.forEach(c => c.classList.toggle("d-none", willCollapse));
-  }
-
-  function collapseAll() {
-      document.querySelectorAll(".js-template-row").forEach(p => p.classList.add("collapsed"));
-      document.querySelectorAll(".js-variant-row").forEach(c => c.classList.add("d-none"));
-  }
-
-  function expandAll() {
-      document.querySelectorAll(".js-template-row").forEach(p => p.classList.remove("collapsed"));
-      document.querySelectorAll(".js-variant-row").forEach(c => c.classList.remove("d-none"));
-  }
-
-  // ====== INIT ======
-  document.addEventListener("DOMContentLoaded", () => {
-      renderTable();
-
-      const btnExpand = document.getElementById("btnExpandAll");
-      const btnCollapse = document.getElementById("btnCollapseAll");
-      if (btnExpand) btnExpand.addEventListener("click", expandAll);
-      if (btnCollapse) btnCollapse.addEventListener("click", collapseAll);
-
-      // aktifkan tooltip bootstrap
-      if (window.bootstrap) {
-          document.querySelectorAll(".has-tooltip").forEach(el => {
-              new bootstrap.Tooltip(el, { placement: "top" });
-          });
-      }
-  });
+    if (window.bootstrap) {
+        document.querySelectorAll(".has-tooltip").forEach(el => new bootstrap.Tooltip(el, { placement: "top" }));
+    }
+});
 </script>
+
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>

@@ -1,7 +1,6 @@
 package com.sarinah.product_bundling.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+
 import com.sarinah.product_bundling.model.entity.*;
 import com.sarinah.product_bundling.model.request.InjSpecRowUpdateRequest;
 import com.sarinah.product_bundling.model.response.*;
@@ -378,33 +377,150 @@ public class ProductInjSpecService {
         );
     }
 
+//    public Page<ProductOdooInjSpecResponse> getOdooProductInjList(String q,
+//                                                             Long locationId,
+//                                                             Pageable pageable) {
+//
+//        // 1) ambil page produk dulu
+//        Page<CatalogOdooProduct> productPage;
+//        if (q == null || q.isBlank()) {
+//            productPage = catalogueOdooProductRepository.findAll(pageable);
+//        } else {
+//            productPage = catalogueOdooProductRepository
+//                    .findBySkuContainingIgnoreCaseOrNameContainingIgnoreCase(q, q, pageable);
+//        }
+//
+//        // 2) mapping ke DTO list row
+//        List<ProductOdooInjSpecResponse> rows = productPage
+//                .getContent()
+//                .stream()
+//                .map(product -> mapToOdooListRow(product, locationId))
+//                .toList();
+//
+//        // 3) bungkus lagi sebagai Page
+//        return new PageImpl<>(
+//                rows,
+//                pageable,
+//                productPage.getTotalElements()
+//        );
+//    }
+
     public Page<ProductOdooInjSpecResponse> getOdooProductInjList(String q,
-                                                             Long locationId,
-                                                             Pageable pageable) {
+                                                                  Long locationId,
+                                                                  Pageable pageable) {
 
-        // 1) ambil page produk dulu
-        Page<CatalogOdooProduct> productPage;
-        if (q == null || q.isBlank()) {
-            productPage = catalogueOdooProductRepository.findAll(pageable);
-        } else {
-            productPage = catalogueOdooProductRepository
-                    .findBySkuContainingIgnoreCaseOrNameContainingIgnoreCase(q, q, pageable);
-        }
+        // 1) paginasi TEMPLATE, bukan varian
+        Page<Long> templateIdPage = (q == null || q.isBlank())
+                ? catalogueOdooProductRepository.findDistinctTemplateIds(pageable)
+                : catalogueOdooProductRepository.findDistinctTemplateIdsBySearch(q, pageable);
 
-        // 2) mapping ke DTO list row
-        List<ProductOdooInjSpecResponse> rows = productPage
-                .getContent()
-                .stream()
-                .map(product -> mapToOdooListRow(product, locationId))
+        List<Long> templateIds = templateIdPage.getContent();
+
+        // 2) ambil SEMUA varian utk template di halaman ini (template utuh, gak kepotong)
+        List<CatalogOdooProduct> variants = templateIds.isEmpty()
+                ? List.of()
+                : catalogueOdooProductRepository.findByTemplateIdIn(templateIds);
+
+        // 3) group by templateId
+        Map<Long, List<CatalogOdooProduct>> grouped = variants.stream()
+                .collect(Collectors.groupingBy(CatalogOdooProduct::getTemplateId));
+
+        // 4) build row per template (urut sesuai urutan halaman)
+        List<ProductOdooInjSpecResponse> rows = templateIds.stream()
+                .map(tid -> mapTemplateToListRow(grouped.getOrDefault(tid, List.of()), locationId))
                 .toList();
 
-        // 3) bungkus lagi sebagai Page
-        return new PageImpl<>(
-                rows,
-                pageable,
-                productPage.getTotalElements()
-        );
+        // 5) totalElements = total TEMPLATE
+        return new PageImpl<>(rows, pageable, templateIdPage.getTotalElements());
     }
+
+    private ProductOdooInjSpecResponse mapTemplateToListRow(
+            List<CatalogOdooProduct> variantsOfTemplate,
+            Long locationId) {
+
+        ProductOdooInjSpecResponse resp = new ProductOdooInjSpecResponse();
+
+        if (variantsOfTemplate == null || variantsOfTemplate.isEmpty()) {
+            resp.setVariants(List.of());
+            resp.setLocationCount(0L);
+            resp.setActiveLocationCount(0L);
+            return resp;
+        }
+
+        // anchor = varian pertama → info level template
+        CatalogOdooProduct anchor = variantsOfTemplate.get(0);
+        resp.setTemplateId(anchor.getTemplateId());
+        resp.setTemplateName(anchor.getTemplateName());
+        resp.setImage(anchor.getHasImage() != null && anchor.getHasImage());
+        // resp.setCategory(anchor.getCategory());
+        // resp.setBrand(anchor.getBrand());
+        // resp.setOwnerId(anchor.getOwner());
+
+        long tplLocation = 0L;
+        long tplActive   = 0L;
+        Instant tplLastSync = null;
+
+        List<VariantOdooInjSpecResponse> variantDtos = new ArrayList<>();
+
+        for (CatalogOdooProduct product : variantsOfTemplate) {
+            VariantRowResult r = buildVariantRow(product, locationId);
+
+            variantDtos.add(r.variant());
+            tplLocation += r.locationCount();
+            tplActive   += r.activeLocationCount();
+
+            // lastSync template = yang paling baru di antara semua varian
+            if (r.lastSyncedAt() != null &&
+                    (tplLastSync == null || r.lastSyncedAt().isAfter(tplLastSync))) {
+                tplLastSync = r.lastSyncedAt();
+            }
+        }
+
+        resp.setVariants(variantDtos);
+        resp.setLocationCount(tplLocation);
+        resp.setActiveLocationCount(tplActive);
+        resp.setLastSyncedAt(tplLastSync);
+
+        return resp;
+    }
+
+    // ===== HELPER: hitung 1 varian (stocks, configs, counts, lastSync, variant DTO) =====
+    private VariantRowResult buildVariantRow(CatalogOdooProduct product, Long locationId) {
+
+        List<CatalogueOdooProductStock> stocks =
+                (locationId == null)
+                        ? catalogueOdooProductStockRepository.findByProductId(product.getId())
+                        : catalogueOdooProductStockRepository.findByProductIdAndLocationId(product.getId(), locationId);
+
+        List<ProductBundling> configs =
+                productBundlingRepository.findByOdooProductId(product.getOdooProductId());
+
+        long locationCount = stocks.size();
+        long activeLocationCount = configs.stream()
+                .filter(pb -> Boolean.TRUE.equals(pb.getActive()))
+                .filter(pb -> locationId == null || locationId.equals(pb.getLocationId()))
+                .count();
+
+        Instant lastSyncedAt = inventoryInjRepository
+                .findFirstByOdooProductIdOrderBySyncedAtDesc(product.getOdooProductId())
+                .map(InventoryInj::getSyncedAt)
+                .orElse(null);
+
+        VariantOdooInjSpecResponse variant = mapVariantOdoo(product, stocks, configs);
+        // pastikan count per-varian ikut ke DTO varian (dipakai child row di Thymeleaf)
+        variant.setLocationCount(locationCount);
+        variant.setActiveLocationCount(activeLocationCount);
+        variant.setLastSyncedAt(lastSyncedAt);
+
+        return new VariantRowResult(variant, locationCount, activeLocationCount, lastSyncedAt);
+    }
+
+    // small carrier
+    private record VariantRowResult(
+            VariantOdooInjSpecResponse variant,
+            long locationCount,
+            long activeLocationCount,
+            Instant lastSyncedAt) {}
 
 
     private ProductInjListRowResponse mapToListRow(CatalogueProduct product, Long locationId) {

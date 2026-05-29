@@ -54,30 +54,7 @@ import java.util.stream.Collectors;
  */
 
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.sarinah.product_bundling.adaptor.SarinahGetModulAdaptor;
-import com.sarinah.product_bundling.model.entity.CatalogOdooProduct;
-import com.sarinah.product_bundling.model.entity.CatalogOdooProductAttribute;
-import com.sarinah.product_bundling.model.entity.CatalogueOdooProductStock;
-import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.jpa.repository.EntityGraph;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * 1-FILE COPYPASTE VERSION (Service + TxService + Repository interface)
