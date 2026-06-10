@@ -7,6 +7,7 @@ import com.sarinah.product_bundling.model.response.*;
 import com.sarinah.product_bundling.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -314,6 +315,20 @@ public class ProductInjSpecService {
                 // pakai salah satu varian sebagai anchor, boleh yang mana saja
                 ProductOdooInjSpecResponse spec =
                         getSpecOdooForProduct(p.getOdooProductId());
+
+                if (spec.getVariants() != null) {
+                    spec.getVariants().forEach(variant -> {
+                        if (variant.getRows() != null) {
+                            variant.getRows().removeIf(row -> !Boolean.TRUE.equals(row.getActive()));
+                        }
+                    });
+                }
+
+                // 🔽 kalau seluruh produk udah nggak punya variant/lokasi aktif → skip
+                if (spec.getVariants() == null || spec.getVariants().isEmpty()) {
+                    continue;
+                }
+
                 spec.setBrand(null);
                 spec.setOwnerId(null);
                 spec.setProductId(spec.getTemplateId());
@@ -829,7 +844,7 @@ public class ProductInjSpecService {
 
 
 
-
+    @CacheEvict(value = "all-specs", allEntries = true)
     public void saveSpecForOdooProduct(Long odooProductId, List<InjSpecRowUpdateRequest> rows) {
         CatalogOdooProduct product = catalogueOdooProductRepository.findByOdooProductId(odooProductId)
                 .orElseThrow(() -> new RuntimeException("Product not found: " + odooProductId));
