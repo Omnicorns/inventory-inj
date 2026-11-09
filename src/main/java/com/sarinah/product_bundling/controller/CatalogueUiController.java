@@ -70,10 +70,7 @@ public class CatalogueUiController {
 //            @RequestParam(defaultValue = "20") int size,
 //            Model model
 //    ) {
-//        // batasi ukuran halaman agar permintaan size=100000 tidak membebani server
-        int safeSize = Math.min(Math.max(size, 1), 100);
-        int safePage = Math.max(page, 0);
-        Pageable pageable = PageRequest.of(safePage, safeSize);
+//        Pageable pageable = PageRequest.of(page, size);
 //
 //        Page<ProductOdooInjSpecResponse> resultPage =
 //                productInjSpecService.getOdooProductInjList(q, locationId, pageable);
@@ -83,7 +80,7 @@ public class CatalogueUiController {
 //        model.addAttribute("page", resultPage);
 //        model.addAttribute("q", q);
 //        model.addAttribute("locationId", locationId);
-//        model.addAttribute("size", safeSize);
+//        model.addAttribute("size", size);
 //
 //        return "inj-spec-list";
 //    }
@@ -124,7 +121,10 @@ public class CatalogueUiController {
             @RequestParam(defaultValue = "20") int size,
             Model model
     ) {
-        Pageable pageable = PageRequest.of(page, size);
+        // batasi ukuran halaman agar permintaan size=100000 tidak membebani server
+        int safeSize = Math.min(Math.max(size, 1), 100);
+        int safePage = Math.max(page, 0);
+        Pageable pageable = PageRequest.of(safePage, safeSize);
 
         Page<ProductOdooInjSpecResponse> resultPage =
                 productInjSpecService.getOdooProductInjList(q, locationId, pageable);
@@ -133,7 +133,7 @@ public class CatalogueUiController {
         model.addAttribute("page", resultPage);
         model.addAttribute("q", q);
         model.addAttribute("locationId", locationId);
-        model.addAttribute("size", size);
+        model.addAttribute("size", safeSize);
 
         return "inj-spec-list";
     }
