@@ -93,10 +93,15 @@ public class SarinahGetModulAdaptorConfiguration {
                     }
 
                     // Halaman/response terindikasi diblokir AV -> tutup dan ulang jika ada sisa percobaan
+                    log.warn("Respons {} {} dianggap diblokir AV/proxy (HTTP {}, percobaan {}/{})",
+                            request.getMethod(), request.getURI(), resp.getRawStatusCode(), attempt, total);
                     safeClose(resp);
                     lastResp = null; // kita tidak simpan resp ini karena sudah ditutup
                 } catch (IOException ioe) {
                     lastIo = ioe; // simpan IOException untuk dilaporkan bila mentok
+                    log.warn("Panggilan {} {} gagal (percobaan {}/{}): {}: {}",
+                            request.getMethod(), request.getURI(), attempt, total,
+                            ioe.getClass().getSimpleName(), ioe.getMessage());
                 }
 
                 if (attempt < total) {
@@ -108,18 +113,24 @@ public class SarinahGetModulAdaptorConfiguration {
                 // Percobaan terakhir
                 if (lastIo != null) {
                     String msg = "Retry gagal: " + lastIo.getMessage();
-                    return new ByteArrayClientHttpResponse(HttpStatus.BAD_GATEWAY, new HttpHeaders(),
+                    return new ByteArrayClientHttpResponse(HttpStatus.BAD_GATEWAY, textHeaders(),
                             msg.getBytes(StandardCharsets.UTF_8));
                 }
                 if (lastResp != null) {
                     return lastResp;
                 }
-                return new ByteArrayClientHttpResponse(HttpStatus.BAD_GATEWAY, new HttpHeaders(),
-                        "Retry gagal tanpa response".getBytes(StandardCharsets.UTF_8));
+                return new ByteArrayClientHttpResponse(HttpStatus.BAD_GATEWAY, textHeaders(),
+                        "Diblokir AV/proxy (respons ditolak setelah retry)".getBytes(StandardCharsets.UTF_8));
             }
 
             // Unreachable tetapi compiler happy
             return execution.execute(request, body);
+        }
+
+        private static HttpHeaders textHeaders() {
+            HttpHeaders h = new HttpHeaders();
+            h.setContentType(new MediaType(MediaType.TEXT_PLAIN, StandardCharsets.UTF_8));
+            return h;
         }
 
         private boolean isBlockedByAV(ClientHttpResponse resp) throws IOException {
