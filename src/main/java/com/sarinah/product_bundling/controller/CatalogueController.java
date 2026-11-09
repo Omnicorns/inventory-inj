@@ -33,7 +33,8 @@ public class CatalogueController {
     @PutMapping("/save/inj-spec/{odooProductId}")
     public ResponseEntity<Void> saveInjSpec(
             @PathVariable Long odooProductId,
-            @RequestBody List<InjSpecRowUpdateRequest> rows
+            @RequestBody @jakarta.validation.constraints.Size(max = 500, message = "Terlalu banyak baris (maks. 500)")
+            List<@jakarta.validation.Valid InjSpecRowUpdateRequest> rows
     ) {
         productInjSpecService.saveSpecForOdooProduct(odooProductId, rows);
         return ResponseEntity.noContent().build();
@@ -49,7 +50,11 @@ public class CatalogueController {
     public ResponseEntity<?> getInjSpec(
             @RequestParam(required = false) Long odooProductId,
             @RequestParam(required = false) String sku,
-            @RequestParam(required = false) String category
+            @RequestParam(required = false) String category,
+            // Opsional: tanpa page/size hasil tetap lengkap seperti sebelumnya. Klien disarankan memakai
+            // paging (size maks. 500); jumlah total ada di header X-Total-Count.
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size
     ) {
 //        if (odooProductId != null) {
 //            // detail 1 produk
@@ -102,7 +107,18 @@ public class CatalogueController {
                     })
                     .collect(Collectors.toList());
 
-            return ResponseEntity.ok(list);
+            if (size == null && page == null) {
+                return ResponseEntity.ok(list);
+            }
+            int pageSize = Math.min(Math.max(size == null ? 100 : size, 1), 500);
+            int pageIndex = Math.max(page == null ? 0 : page, 0);
+            long from = (long) pageIndex * pageSize;
+            List<ProductOdooInjSpecResponse> slice = from >= list.size()
+                    ? List.of()
+                    : list.subList((int) from, (int) Math.min(from + pageSize, list.size()));
+            return ResponseEntity.ok()
+                    .header("X-Total-Count", String.valueOf(list.size()))
+                    .body(slice);
         }
     }
 
