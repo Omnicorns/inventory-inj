@@ -43,7 +43,7 @@ public class SarinahGetModulAdaptor {
                 .toEntity(byte[].class);
 
         byte[] raw = resp.getBody() != null ? resp.getBody() : new byte[0];
-        if (!resp.getStatusCode().is2xx()) {
+        if (!resp.getStatusCode().is2xxSuccessful()) {
             throw new IllegalStateException("Portal product_inj membalas HTTP " + resp.getStatusCode().value()
                     + " (Content-Type=" + resp.getHeaders().getContentType() + "): " + snippet(raw));
         }
