@@ -257,7 +257,7 @@ public class SarinahGetModulAdaptorConfiguration {
                     converters.add(new MappingJackson2HttpMessageConverter());    // untuk JSON <-> Object
                 })
                 // Retry khusus halaman/response AV
-                .requestInterceptor(new AntivirusRetryInterceptor(1, 300))
+                .requestInterceptor(new AntivirusRetryInterceptor(2, 1000))
                 .build();
     }
 }
