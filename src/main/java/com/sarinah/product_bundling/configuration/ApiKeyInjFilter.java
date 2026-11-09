@@ -4,41 +4,56 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.List;
 
-@Component
+/**
+ * Autentikasi klien sistem (server-to-server) lewat header X-API-KEY.
+ *
+ * - Header ada dan benar  -> request diautentikasi sebagai ROLE_INJ untuk request ini saja (tanpa session).
+ * - Header ada tetapi salah -> langsung 401.
+ * - Header tidak ada -> dilanjutkan; akses ditentukan aturan di {@link SecurityConfig} (login session).
+ *
+ * Filter ini dipasang di dalam rantai Spring Security (bukan filter servlet global) sehingga
+ * berlaku untuk semua endpoint yang dilindungi, termasuk PUT /save/inj-spec dan POST /sync.
+ * Perbandingan key memakai waktu konstan.
+ */
 public class ApiKeyInjFilter extends OncePerRequestFilter {
 
-    @Value("${api-key}")
-    private String configuredApiKey;
+    static final String HEADER = "X-API-KEY";
+
+    private final byte[] expectedKey;
+
+    public ApiKeyInjFilter(String configuredApiKey) {
+        if (configuredApiKey == null || configuredApiKey.isBlank()) {
+            throw new IllegalStateException("api.key wajib diisi (environment API_KEY)");
+        }
+        this.expectedKey = configuredApiKey.getBytes(StandardCharsets.UTF_8);
+    }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
-        String path = request.getRequestURI();
-
-        // hanya cek untuk path inj-spec (GET/PUT/POST apa pun)
-        if (!path.startsWith("/sarinah-forwarder/v1/catalogue/inj-spec")) {
-            filterChain.doFilter(request, response);
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+            throws ServletException, IOException {
+        String provided = request.getHeader(HEADER);
+        if (provided == null) {
+            chain.doFilter(request, response);
             return;
         }
-
-        String apiKeyHeader = request.getHeader("X-API-KEY");
-
-        if (apiKeyHeader == null || !apiKeyHeader.equals(configuredApiKey)) {
-            // kalau tidak ada / tidak cocok → 401
+        if (!MessageDigest.isEqual(provided.getBytes(StandardCharsets.UTF_8), expectedKey)) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json");
             response.getWriter().write("{\"error\":\"invalid_api_key\"}");
             return;
         }
-
-        // kalau OK, lanjut ke filter berikutnya / controller
-        filterChain.doFilter(request, response);
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("api-client", null, List.of(new SimpleGrantedAuthority("ROLE_INJ"))));
+        chain.doFilter(request, response);
     }
-
-    }
-
+}

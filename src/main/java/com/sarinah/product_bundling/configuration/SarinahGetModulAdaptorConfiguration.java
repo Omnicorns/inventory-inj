@@ -56,6 +56,12 @@ public class SarinahGetModulAdaptorConfiguration {
     @Value("${http.client.read-timeout}")
     private int readTimeout;
 
+    /** Default false: sertifikat server diverifikasi memakai truststore JVM. */
+    @Value("${http.client.insecure-ssl:false}")
+    private boolean insecureSsl;
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SarinahGetModulAdaptorConfiguration.class);
+
     /**
      * Interceptor untuk retry bila halaman diblokir AV/proxy.
      * Tidak akan melempar exception ke caller; pada percobaan terakhir,
@@ -161,18 +167,26 @@ public class SarinahGetModulAdaptorConfiguration {
     private HttpComponentsClientHttpRequestFactory getRequestFactory(MeterRegistry meterRegistry)
             throws NoSuchAlgorithmException, KeyManagementException {
 
-        // SSLContext “trust-all” (umum saat AV melakukan MITM cert di jaringan korporat)
-        SSLContext sslContext;
-        try {
-            sslContext = SSLContextBuilder.create()
-                    .loadTrustMaterial(null, (TrustStrategy) (chain, authType) -> true)
-                    .build();
-        } catch (Exception e) {
-            throw new RuntimeException("Gagal membuat SSLContext trust-all", e);
+        // Verifikasi sertifikat TLS aktif secara default (truststore JVM + pengecekan hostname).
+        // Bila jaringan memakai inspeksi TLS (antivirus/proxy), impor CA perusahaan ke truststore Java,
+        // atau -Djavax.net.ssl.trustStore=... Mode trust-all hanya untuk darurat (http.client.insecure-ssl=true).
+        SSLConnectionSocketFactory tlsFactory;
+        if (insecureSsl) {
+            log.warn("PERINGATAN KEAMANAN: http.client.insecure-ssl=true, sertifikat TLS TIDAK diverifikasi");
+            try {
+                SSLContext trustAll = SSLContextBuilder.create()
+                        .loadTrustMaterial(null, (TrustStrategy) (chain, authType) -> true)
+                        .build();
+                tlsFactory = new SSLConnectionSocketFactory(trustAll, NoopHostnameVerifier.INSTANCE);
+            } catch (Exception e) {
+                throw new RuntimeException("Gagal membuat SSLContext trust-all", e);
+            }
+        } else {
+            tlsFactory = new SSLConnectionSocketFactory(org.apache.hc.core5.ssl.SSLContexts.createSystemDefault());
         }
 
         var sfr = org.apache.hc.core5.http.config.RegistryBuilder.<ConnectionSocketFactory>create()
-                .register("https", new SSLConnectionSocketFactory(sslContext, NoopHostnameVerifier.INSTANCE))
+                .register("https", tlsFactory)
                 .register("http", PlainConnectionSocketFactory.getSocketFactory())
                 .build();
 
