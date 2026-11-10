@@ -2,8 +2,8 @@ package com.sarinah.product_bundling.service;
 
 
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 import com.sarinah.product_bundling.adaptor.SarinahGetModulAdaptor;
 import com.sarinah.product_bundling.model.entity.CatalogOdooProduct;
 import com.sarinah.product_bundling.model.entity.CatalogOdooProductAttribute;
@@ -23,8 +23,8 @@ import java.util.stream.Collectors;
 
 
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -72,7 +72,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class PostSaveOdooCatalogueProductService {
 
-    private final ObjectMapper objectMapper; // biarin kalau memang dipakai di tempat lain
+    private final JsonMapper objectMapper; // biarin kalau memang dipakai di tempat lain
     private final SarinahGetModulAdaptor sarinahGetModulAdaptor;
     private final CatalogueUpsertTxService upsertTxService;
 
@@ -159,10 +159,10 @@ public class PostSaveOdooCatalogueProductService {
             Long templateId = templateNode.path("template_id").isNumber()
                     ? templateNode.get("template_id").asLong()
                     : null;
-            String templateName = templateNode.path("template_name").asText(null);
-            String category = templateNode.path("category").asText(null);
-            String brand = templateNode.path("brand").asText(null);
-            String owner = templateNode.path("owner_id").asText(null);
+            String templateName = templateNode.path("template_name").asString(null);
+            String category = templateNode.path("category").asString(null);
+            String brand = templateNode.path("brand").asString(null);
+            String owner = templateNode.path("owner_id").asString(null);
 
             JsonNode variants = templateNode.get("variants");
             if (variants == null || !variants.isArray()) continue;
@@ -188,7 +188,7 @@ public class PostSaveOdooCatalogueProductService {
                     if (saved) savedCount++;
                 } catch (Exception e) {
                     log.warn("Gagal memproses variant node (skip). odooId={}, err={}",
-                            variantNode.path("id").asText("?"), e.toString());
+                            variantNode.path("id").asString("?"), e.toString());
                 }
             }
         }
@@ -271,9 +271,9 @@ public class PostSaveOdooCatalogueProductService {
         ) {
             boolean changed = false;
 
-            String sku = node.path("default_code").asText(null);
-            String name = node.path("name").asText(null);
-            String barcode = node.path("barcode").asText(null);
+            String sku = node.path("default_code").asString(null);
+            String name = node.path("name").asString(null);
+            String barcode = node.path("barcode").asString(null);
             BigDecimal listPrice = asBigDecimal(node.get("list_price"));
 
             // handle image: bisa false / true / base64 string
@@ -284,8 +284,8 @@ public class PostSaveOdooCatalogueProductService {
             if (imageNode != null && !imageNode.isNull()) {
                 if (imageNode.isBoolean()) {
                     hasImagePayload = imageNode.asBoolean(false);
-                } else if (imageNode.isTextual()) {
-                    String img = imageNode.asText();
+                } else if (imageNode.isString()) {
+                    String img = imageNode.asString();
                     if (img != null && !img.isBlank() && !"false".equalsIgnoreCase(img)) {
                         hasImagePayload = true;
                         imageBase64Payload = img;
@@ -344,9 +344,9 @@ public class PostSaveOdooCatalogueProductService {
 
             if (attrsNode != null && attrsNode.isArray()) {
                 for (JsonNode attrNode : attrsNode) {
-                    String attrName = attrNode.path("attribute").asText(null);
-                    String attrValue = attrNode.path("value").asText(null);
-                    String display = attrNode.path("display_name").asText(null);
+                    String attrName = attrNode.path("attribute").asString(null);
+                    String attrValue = attrNode.path("value").asString(null);
+                    String display = attrNode.path("display_name").asString(null);
 
                     if ((display == null || display.isBlank()) && attrName != null && attrValue != null) {
                         display = attrName + ": " + attrValue;
@@ -376,9 +376,9 @@ public class PostSaveOdooCatalogueProductService {
 
             if (!newSnapshot.isEmpty() && attrsNode != null && attrsNode.isArray()) {
                 for (JsonNode attrNode : attrsNode) {
-                    String attrName = attrNode.path("attribute").asText(null);
-                    String attrValue = attrNode.path("value").asText(null);
-                    String display = attrNode.path("display_name").asText(null);
+                    String attrName = attrNode.path("attribute").asString(null);
+                    String attrValue = attrNode.path("value").asString(null);
+                    String display = attrNode.path("display_name").asString(null);
 
                     if ((display == null || display.isBlank()) && attrName != null && attrValue != null) {
                         display = attrName + ": " + attrValue;
@@ -418,17 +418,15 @@ public class PostSaveOdooCatalogueProductService {
             Set<String> seenKeys = new HashSet<>();
 
             if (stockByLocation != null && stockByLocation.isObject()) {
-                Iterator<String> fieldNames = stockByLocation.fieldNames();
-                while (fieldNames.hasNext()) {
-                    String field = fieldNames.next();
+                for (String field : stockByLocation.propertyNames()) {
                     JsonNode locNode = stockByLocation.get(field);
                     if (locNode == null || locNode.isNull()) continue;
 
                     Long locationId = locNode.path("id").asLong();
-                    String locationName = locNode.path("location").asText(null);
-                    String pricelistName = locNode.path("pricelist_name").asText(null);
+                    String locationName = locNode.path("location").asString(null);
+                    String pricelistName = locNode.path("pricelist_name").asString(null);
                     BigDecimal quantity = asBigDecimal(locNode.get("quantity"));
-                    String uom = locNode.path("uom").asText(null);
+                    String uom = locNode.path("uom").asString(null);
                     BigDecimal price = asBigDecimal(locNode.get("price"));
 
                     String key = stockKey(locationId, pricelistName);
@@ -472,8 +470,8 @@ public class PostSaveOdooCatalogueProductService {
         private BigDecimal asBigDecimal(JsonNode node) {
             if (node == null || node.isNull()) return null;
             if (node.isNumber()) return node.decimalValue();
-            if (node.isTextual()) {
-                String text = node.asText();
+            if (node.isString()) {
+                String text = node.asString();
                 if (text == null || text.isBlank()) return null;
                 try {
                     return new BigDecimal(text);

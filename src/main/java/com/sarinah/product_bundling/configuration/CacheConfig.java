@@ -1,6 +1,6 @@
 package com.sarinah.product_bundling.configuration;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.CacheManager;
@@ -30,7 +30,7 @@ public class CacheConfig {
     // ⬇️ TAMBAHKAN METHOD HELPER
     private <T> T deepCopy(T object) {
         try {
-            ObjectMapper mapper = new ObjectMapper();
+            JsonMapper mapper = JsonMapper.builder().build();
             String json = mapper.writeValueAsString(object);
             return (T) mapper.readValue(json, object.getClass());
         } catch (Exception e) {
