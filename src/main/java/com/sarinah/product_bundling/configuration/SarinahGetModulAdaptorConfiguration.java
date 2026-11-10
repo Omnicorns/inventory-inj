@@ -94,7 +94,7 @@ public class SarinahGetModulAdaptorConfiguration {
 
                     // Halaman/response terindikasi diblokir AV -> tutup dan ulang jika ada sisa percobaan
                     log.warn("Respons {} {} dianggap diblokir AV/proxy (HTTP {}, percobaan {}/{})",
-                            request.getMethod(), request.getURI(), resp.getRawStatusCode(), attempt, total);
+                            request.getMethod(), request.getURI(), resp.getStatusCode().value(), attempt, total);
                     safeClose(resp);
                     lastResp = null; // kita tidak simpan resp ini karena sudah ditutup
                 } catch (IOException ioe) {
