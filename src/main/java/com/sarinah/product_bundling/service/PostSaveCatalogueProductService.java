@@ -1,7 +1,7 @@
 package com.sarinah.product_bundling.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 import com.sarinah.product_bundling.adaptor.SarinahGetModulAdaptor;
 import com.sarinah.product_bundling.model.entity.CatalogueProduct;
 import com.sarinah.product_bundling.model.entity.CatalogueProductStock;
@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class PostSaveCatalogueProductService {
-    private final ObjectMapper objectMapper;
+    private final JsonMapper objectMapper;
     private final SarinahGetModulAdaptor sarinahGetModulAdaptor;
     private final CatalogueProductRepository catalogueProductRepository;
 
@@ -47,9 +47,9 @@ public class PostSaveCatalogueProductService {
             return;
         }
 
-        String sku = node.path("default_code").asText(null);
-        String name = node.path("name").asText(null);
-        String barcode = node.path("barcode").asText(null);
+        String sku = node.path("default_code").asString(null);
+        String name = node.path("name").asString(null);
+        String barcode = node.path("barcode").asString(null);
         BigDecimal listPrice = asBigDecimal(node.get("list_price"));
 
         // --- handle image: bisa false atau base64 ---
@@ -61,9 +61,9 @@ public class PostSaveCatalogueProductService {
             if (imageNode.isBoolean()) {
                 // kalau literal boolean dari Odoo (false / true)
                 hasImage = imageNode.asBoolean(false);
-            } else if (imageNode.isTextual()) {
+            } else if (imageNode.isString()) {
                 // kalau base64 string
-                String img = imageNode.asText();
+                String img = imageNode.asString();
                 if (img != null && !img.isBlank() && !"false".equalsIgnoreCase(img)) {
                     hasImage = true;
                     imageBase64 = img;
@@ -106,16 +106,14 @@ public class PostSaveCatalogueProductService {
         // --- mapping stock_by_location ---
         JsonNode stockByLocation = node.get("stock_by_location");
         if (stockByLocation != null && stockByLocation.isObject()) {
-            Iterator<String> fieldNames = stockByLocation.fieldNames();
-            while (fieldNames.hasNext()) {
-                String field = fieldNames.next();       // contoh: "311143"
+            for (String field : stockByLocation.propertyNames()) {       // contoh: "311143"
                 JsonNode locNode = stockByLocation.get(field);
 
                 Long locationId = locNode.path("id").asLong();
-                String locationName = locNode.path("location").asText(null);    // "THA/Stock/Thamrin"
-                String pricelistName = locNode.path("pricelist_name").asText(null);
+                String locationName = locNode.path("location").asString(null);    // "THA/Stock/Thamrin"
+                String pricelistName = locNode.path("pricelist_name").asString(null);
                 BigDecimal quantity = asBigDecimal(locNode.get("quantity"));    // 11.0
-                String uom = locNode.path("uom").asText(null);                  // "Pcs"
+                String uom = locNode.path("uom").asString(null);                  // "Pcs"
                 BigDecimal price = asBigDecimal(locNode.get("price"));          // 87000.0
 
                 String key = stockKey(locationId, pricelistName);
@@ -159,8 +157,8 @@ public class PostSaveCatalogueProductService {
         if (node.isNumber()) {
             return node.decimalValue();
         }
-        if (node.isTextual()) {
-            String text = node.asText();
+        if (node.isString()) {
+            String text = node.asString();
             if (text == null || text.isBlank()) {
                 return null;
             }
