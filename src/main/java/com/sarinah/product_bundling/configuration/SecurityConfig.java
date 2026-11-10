@@ -16,7 +16,7 @@ import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.OrRequestMatcher;
 
 @Configuration
@@ -51,8 +51,8 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http, @Value("${api.key}") String apiKey) throws Exception {
 
         OrRequestMatcher apiPaths = new OrRequestMatcher(
-                new AntPathRequestMatcher("/sarinah-forwarder/**"),
-                new AntPathRequestMatcher("/api/**")
+                PathPatternRequestMatcher.withDefaults().matcher("/sarinah-forwarder/**"),
+                PathPatternRequestMatcher.withDefaults().matcher("/api/**")
         );
 
         http

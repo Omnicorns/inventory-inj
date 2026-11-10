@@ -24,7 +24,7 @@ import org.springframework.http.*;
 import org.springframework.http.client.*;
 import org.springframework.http.converter.ByteArrayHttpMessageConverter;
 import org.springframework.http.converter.StringHttpMessageConverter;
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.util.StreamUtils;
 import org.springframework.web.client.RestClient;
 
@@ -134,7 +134,7 @@ public class SarinahGetModulAdaptorConfiguration {
         }
 
         private boolean isBlockedByAV(ClientHttpResponse resp) throws IOException {
-            int code = resp.getRawStatusCode(); // <-- PERBAIKAN: aman utk 499/non-standar
+            int code = resp.getStatusCode().value(); // aman utk 499/non-standar
             if (AV_STATUS.contains(code)) return true;
 
             MediaType ct = resp.getHeaders().getContentType();
@@ -166,8 +166,7 @@ public class SarinahGetModulAdaptorConfiguration {
             }
 
             @Override public HttpStatusCode getStatusCode() { return status; }
-            @Override public int getRawStatusCode() { return status.value(); }
-            @Override public String getStatusText() { return status.toString(); }
+            public String getStatusText() { return status.toString(); }
             @Override public HttpHeaders getHeaders() { return headers; }
             @Override public InputStream getBody() { return new ByteArrayInputStream(body); }
             @Override public void close() { /* no-op */ }
@@ -254,7 +253,7 @@ public class SarinahGetModulAdaptorConfiguration {
                 .messageConverters(converters -> {
                     converters.add(new ByteArrayHttpMessageConverter());           // untuk byte[]
                     converters.add(new StringHttpMessageConverter());             // untuk String
-                    converters.add(new MappingJackson2HttpMessageConverter());    // untuk JSON <-> Object
+                    converters.add(new JacksonJsonHttpMessageConverter());    // untuk JSON <-> Object
                 })
                 // Retry khusus halaman/response AV
                 .requestInterceptor(new AntivirusRetryInterceptor(2, 1000))

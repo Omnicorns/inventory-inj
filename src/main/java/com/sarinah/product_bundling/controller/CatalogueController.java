@@ -1,6 +1,6 @@
 package com.sarinah.product_bundling.controller;
 
-import com.fasterxml.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ArrayNode;
 import com.sarinah.product_bundling.model.entity.InventoryInj;
 import com.sarinah.product_bundling.model.request.InjSpecRowUpdateRequest;
 import com.sarinah.product_bundling.model.response.ProductInjSpecResponse;

@@ -1,9 +1,9 @@
 package com.sarinah.product_bundling.adaptor;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.json.JsonMapper;
 
 import lombok.RequiredArgsConstructor;
 
@@ -16,7 +16,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
-import java.io.IOException;
 
 @RequiredArgsConstructor
 @Component
@@ -26,7 +25,7 @@ public class SarinahGetModulAdaptor {
     private String postProductInjUrl;
 
     private final RestClient defaultPointRestClient;
-    private final ObjectMapper objectMapper;
+    private final JsonMapper objectMapper;
 
     private static final Logger log = LoggerFactory.getLogger(SarinahGetModulAdaptor.class);
 
@@ -43,7 +42,7 @@ public class SarinahGetModulAdaptor {
                 .toEntity(byte[].class);
 
         byte[] raw = resp.getBody() != null ? resp.getBody() : new byte[0];
-        if (!resp.getStatusCode().is2xx()) {
+        if (!resp.getStatusCode().is2xxSuccessful()) {
             throw new IllegalStateException("Portal product_inj membalas HTTP " + resp.getStatusCode().value()
                     + " (Content-Type=" + resp.getHeaders().getContentType() + "): " + snippet(raw));
         }
@@ -51,7 +50,7 @@ public class SarinahGetModulAdaptor {
         JsonNode root;
         try {
             root = objectMapper.readTree(raw);
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("Respons portal product_inj bukan JSON (HTTP "
                     + resp.getStatusCode().value() + ", Content-Type=" + resp.getHeaders().getContentType()
                     + "): " + snippet(raw), e);
@@ -59,7 +58,7 @@ public class SarinahGetModulAdaptor {
 
 
         if (root == null || root.isMissingNode()) {
-            return JsonNodeFactory.instance.arrayNode();
+            return objectMapper.createArrayNode();
         }
 
 
@@ -68,7 +67,7 @@ public class SarinahGetModulAdaptor {
         }
 
 
-        ArrayNode arr = JsonNodeFactory.instance.arrayNode();
+        ArrayNode arr = objectMapper.createArrayNode();
         arr.add(root);
         return arr;
 
